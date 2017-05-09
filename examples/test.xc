@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 const units(m) double METER = (units(m) double) 1.;
-const units(kg) double KG = (units(kg) double) 1.;
+const units(kg) double KILOGRAM = (units(kg) double) 1.;
 const units(s) double SECOND = (units(s) double) 1.;
 const units(A) double AMPERE = (units(A) double) 1.;
 const units(K) double KELVIN = (units(K) double) 1.;
@@ -13,7 +13,7 @@ int main(void)
     units(m) double length = 5. * METER;
     units(m) double width = 7. * METER;
     units(m) double height = 11. * METER;
-    units(kg) double mass = 13. * KG;
+    units(kg) double mass = 13. * KILOGRAM;
     
     /* when adding, units remain the same */
     units(m) double perim = 2. * (length + width);
