@@ -9,13 +9,13 @@ imports silver:langutil:pp;
 synthesized attribute normalUnits :: [Pair<DimUnit Integer>] occurs on Qualifier;
 
 abstract production unitsQualifier
-top::Qualifier ::= units::Units
+top::Qualifier ::= units::[Pair<DimUnit Integer>]
 {
   local isPositive :: Boolean = false;
   local appliesWithinRef :: Boolean = true;
   local compat :: (Boolean ::= Qualifier) = \qualToCompare::Qualifier ->
     unitsCompat(top.normalUnits, qualToCompare.normalUnits);
-  top.normalUnits = units.normalUnits;
+  top.normalUnits = units;
   forwards to pluggableQualifier(isPositive, appliesWithinRef, compat);
 }
 
@@ -52,24 +52,22 @@ top::Qualifier ::= isPositive::Boolean appliesWithinRef::Boolean
 
 nonterminal Units with normalUnits;
 
-abstract production consDimUnits
-top::Units ::= u::Pair<DimUnit Integer>  us::Units
+abstract production mulDimUnits
+top::Units ::= us1::Units us2::Units
 {
-  top.normalUnits = insertUnit(u, us.normalUnits);
+  top.normalUnits = appendUnits(us1.normalUnits, us2.normalUnits);
 }
 
-abstract production consInvertDimUnits
-top::Units ::= u::Pair<DimUnit Integer>  us::Units
+abstract production expDimUnits
+top::Units ::= us::Units power::Integer
 {
-  local invertU :: Pair<DimUnit Integer> =
-    pair(fst(u), 0 - snd(u));
-  top.normalUnits = insertUnit(invertU, us.normalUnits);
+  top.normalUnits = expUnits(us.normalUnits, power);
 }
 
-abstract production nilDimUnits
-top::Units ::=
+abstract production dimUnit
+top::Units ::= u::DimUnit
 {
-  top.normalUnits = [];
+  top.normalUnits = [pair(u, 1)];
 }
 
 nonterminal DimUnit with unitEq;
@@ -127,44 +125,39 @@ top::DimUnit ::=
 aspect production addOp
 top::NumOp ::=
 {
-  local lunits :: Units =
-    listToUnits(collectUnits(getQualifiers(top.lop.typerep)));
-  local runits :: Units =
-    listToUnits(collectUnits(getQualifiers(top.rop.typerep)));
-
-  local units :: Units =
-    listToUnits(collectUnits(getQualifiers(top.lop.typerep)));
+  local lunits :: [Pair<DimUnit Integer>] =
+    collectUnits(getQualifiers(top.lop.typerep));
+  local runits :: [Pair<DimUnit Integer>] =
+    collectUnits(getQualifiers(top.rop.typerep));
 
   -- FIXME: exceeding flow type
   top.collectedTypeQualifiers <-
-    if   unitsCompat(lunits.normalUnits, runits.normalUnits)
-    then [unitsQualifier(units)]
+    if   unitsCompat(lunits, runits)
+    then [unitsQualifier(lunits)]
     else [];
 }
 
 aspect production subOp
 top::NumOp ::=
 {
-  local lunits :: Units =
-    listToUnits(collectUnits(getQualifiers(top.lop.typerep)));
-  local runits :: Units =
-    listToUnits(collectUnits(getQualifiers(top.rop.typerep)));
-
-  local units :: Units =
-    listToUnits(collectUnits(getQualifiers(top.lop.typerep)));
+  local lunits :: [Pair<DimUnit Integer>] =
+    collectUnits(getQualifiers(top.lop.typerep));
+  local runits :: [Pair<DimUnit Integer>] =
+    collectUnits(getQualifiers(top.rop.typerep));
 
   -- FIXME: exceeding flow type
   top.collectedTypeQualifiers <-
-    if   unitsCompat(lunits.normalUnits, runits.normalUnits)
-    then [unitsQualifier(units)]
+    if   unitsCompat(lunits, runits)
+    then [unitsQualifier(lunits)]
     else [];
 }
 
 aspect production mulOp
 top::NumOp ::=
 {
-  local units :: Units =
-    listToUnits(collectUnits(getQualifiers(top.lop.typerep) ++ getQualifiers(top.rop.typerep)));
+  local units :: [Pair<DimUnit Integer>] =
+    collectUnits(getQualifiers(top.lop.typerep) ++ getQualifiers(top.rop.typerep));
+
   -- FIXME: exceeding flow type
   top.collectedTypeQualifiers <- [unitsQualifier(units)];
 }
@@ -172,9 +165,9 @@ top::NumOp ::=
 aspect production divOp
 top::NumOp ::=
 {
-  local units :: Units =
-    listToUnits(collectUnits(getQualifiers(top.lop.typerep)) ++
-      invertUnits(collectUnits(getQualifiers(top.rop.typerep))));
+  local units :: [Pair<DimUnit Integer>] =
+    collectUnits(getQualifiers(top.lop.typerep)) ++
+      invertUnits(collectUnits(getQualifiers(top.rop.typerep)));
 
   -- FIXME: exceeding flow type
   top.collectedTypeQualifiers <- [unitsQualifier(units)];
@@ -245,41 +238,32 @@ function collectUnits
     then []
     else
       case q of
---        unitsQualifier(_) -> appendUnits(q.normalUnits, rest)
         unitsQualifier(_) -> q.normalUnits ++ rest
       | _                 -> rest
       end;
---  return consDimUnits(pair(meterUnit(), 2), nilDimUnits());
 }
 
---function appendUnits
---[Pair<DimUnit Integer>] ::= xs1::[Pair<DimUnit Integer>]  xs2::[Pair<DimUnit Integer>]
---{
---  return
---    if   null(xs1)
---    then xs2
---    else appendUnits(tail(xs1), insertUnit(head(xs1), xs2));
---}
-
-function listToUnits
-Units ::= xs::[Pair<DimUnit Integer>]
+function appendUnits
+[Pair<DimUnit Integer>] ::= xs1::[Pair<DimUnit Integer>]  xs2::[Pair<DimUnit Integer>]
 {
   return
-    if   null(xs)
-    then nilDimUnits()
-    else consDimUnits(head(xs), listToUnits(tail(xs)));
+    if   null(xs1)
+    then xs2
+    else appendUnits(tail(xs1), insertUnit(head(xs1), xs2));
 }
 
 function invertUnits
 [Pair<DimUnit Integer>] ::= xs::[Pair<DimUnit Integer>]
 {
-  local x :: Pair<DimUnit Integer> = head(xs);
-  local invertX :: Pair<DimUnit Integer> =
-    pair(fst(x), 0 - snd(x));
-
-  return
-    if   null(xs)
-    then []
-    else cons(invertX, invertUnits(tail(xs)));
+  return expUnits(xs, -1);
 }
+
+function expUnits
+[Pair<DimUnit Integer>] ::= xs::[Pair<DimUnit Integer>]  power::Integer
+{
+  local eu :: (Pair<DimUnit Integer> ::= Pair<DimUnit Integer>) =
+    \u :: Pair<DimUnit Integer> -> pair(fst(u), power * snd(u));
+  return map(eu, xs);
+}
+
 

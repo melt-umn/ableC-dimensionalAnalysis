@@ -29,77 +29,81 @@ top::TypeQualifier_c ::= 'units' p::UnitsParameter_c
 
 closed nonterminal UnitsParameter_c with location, ast<abs:Qualifier>;
 concrete production unitsParameter_c
-top::UnitsParameter_c ::= '(' units::Units_c ')'
+top::UnitsParameter_c ::= '(' units::UnitsTerm_c ')'
 {
-  top.ast = unitsQualifier(units.ast);
+  top.ast = unitsQualifier(units.ast.normalUnits);
 }
 
-closed nonterminal Units_c with location, ast<Units>;
-concrete productions top::Units_c
-|  us::Units_c '*' u::UnitAndPower_c
+closed nonterminal UnitsTerm_c with location, ast<Units>;
+concrete productions top::UnitsTerm_c
+| us::UnitsTerm_c '*' u::UnitsExp_c
   {
-    top.ast = consDimUnits(u.ast, us.ast);
+    top.ast = mulDimUnits(us.ast, u.ast);
   }
-| us::Units_c '/' u::UnitAndPower_c
+| us::UnitsTerm_c '/' u::UnitsExp_c
   {
-    top.ast = consInvertDimUnits(u.ast, us.ast);
+    top.ast = mulDimUnits(us.ast, expDimUnits(u.ast, -1));
   }
-| u::UnitAndPower_c
+| u::UnitsExp_c
   {
-    top.ast = consDimUnits(u.ast, nilDimUnits());
+    top.ast = u.ast;
   }
 
-closed nonterminal UnitAndPower_c with location, ast<Pair<DimUnit Integer>>;
-concrete productions top::UnitAndPower_c
-| u::Unit_c power::Power_c
+closed nonterminal UnitsExp_c with location, ast<Units>;
+concrete productions top::UnitsExp_c
+| u::UnitFactor_c '^' power::Power_c
   {
-    top.ast = pair(u.ast, power.ast);
+    top.ast = expDimUnits(u.ast, power.ast);
+  }
+| u::UnitFactor_c
+  {
+    top.ast = u.ast;
   }
 
 closed nonterminal Power_c with location, ast<Integer>;
 concrete productions top::Power_c
-| '^' p::DecConstant_t
+| p::DecConstant_t
   {
     top.ast = toInt(p.lexeme);
   }
-| '^' '-' p::DecConstant_t
+| '-' p::DecConstant_t
   {
     top.ast = 0 - toInt(p.lexeme);
   }
-|
-  {
-    top.ast = 1;
-  }
 
-closed nonterminal Unit_c with location, ast<DimUnit>;
-concrete productions top::Unit_c
+closed nonterminal UnitFactor_c with location, ast<Units>;
+concrete productions top::UnitFactor_c
+| '(' us::UnitsTerm_c ')'
+  {
+    top.ast = us.ast;
+  }
 | unit::Meter_t
   {
-    top.ast = meterUnit();
+    top.ast = dimUnit(meterUnit());
   }
 | unit::Kilogram_t
   {
-    top.ast = kilogramUnit();
+    top.ast = dimUnit(kilogramUnit());
   }
 | unit::Second_t
   {
-    top.ast = secondUnit();
+    top.ast = dimUnit(secondUnit());
   }
 | unit::Ampere_t
   {
-    top.ast = ampereUnit();
+    top.ast = dimUnit(ampereUnit());
   }
 | unit::Kelvin_t
   {
-    top.ast = kelvinUnit();
+    top.ast = dimUnit(kelvinUnit());
   }
 | unit::Mole_t
   {
-    top.ast = moleUnit();
+    top.ast = dimUnit(moleUnit());
   }
 | unit::Candela_t
   {
-    top.ast = candelaUnit();
+    top.ast = dimUnit(candelaUnit());
   }
 
 
