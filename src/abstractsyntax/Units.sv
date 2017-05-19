@@ -11,43 +11,15 @@ synthesized attribute normalUnits :: [Pair<DimUnit Integer>] occurs on Qualifier
 abstract production unitsQualifier
 top::Qualifier ::= units::[Pair<DimUnit Integer>]
 {
-  local isPositive :: Boolean = false;
-  local appliesWithinRef :: Boolean = true;
-  local compat :: (Boolean ::= Qualifier) = \qualToCompare::Qualifier ->
+  propagate host, lifted;
+  top.pp = text(top.qualname);
+  top.qualname = "";
+  top.qualIsPositive = false;
+  top.qualIsNegative = true;
+  top.qualAppliesWithinRef = true;
+  top.qualCompat = \qualToCompare::Qualifier ->
     unitsCompat(top.normalUnits, qualToCompare.normalUnits);
   top.normalUnits = units;
-  forwards to pluggableQualifier(isPositive, appliesWithinRef, compat);
-}
-
-aspect production constQualifier
-top::Qualifier ::=
-{
-  top.normalUnits = [];
-}
-
-aspect production volatileQualifier
-top::Qualifier ::=
-{
-  top.normalUnits = [];
-}
-
-aspect production restrictQualifier
-top::Qualifier ::=
-{
-  top.normalUnits = [];
-}
-
-aspect production uuRestrictQualifier
-top::Qualifier ::=
-{
-  top.normalUnits = [];
-}
-
-aspect production pluggableQualifier
-top::Qualifier ::= isPositive::Boolean appliesWithinRef::Boolean
-                   compat::(Boolean ::= Qualifier)
-{
-  top.normalUnits = [];
 }
 
 nonterminal Units with normalUnits;
