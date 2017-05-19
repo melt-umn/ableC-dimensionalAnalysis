@@ -8,12 +8,18 @@ imports silver:langutil:pp;
 -- normalized units, e.g. simplify (seconds*meters*seconds/meters) as (seconds^2)
 synthesized attribute normalUnits :: [Pair<DimUnit Integer>] occurs on Qualifier;
 
+aspect default production
+top::Qualifier ::=
+{
+  top.normalUnits = [];
+}
+
 abstract production unitsQualifier
 top::Qualifier ::= units::[Pair<DimUnit Integer>]
 {
   propagate host, lifted;
-  top.pp = text(top.qualname);
-  top.qualname = "";
+  top.pp = text("");
+  top.qualname = "units(" ++ implode("*", map(showUnit, units)) ++ ")";
   top.qualIsPositive = false;
   top.qualIsNegative = true;
   top.qualAppliesWithinRef = true;
@@ -42,14 +48,16 @@ top::Units ::= u::DimUnit
   top.normalUnits = [pair(u, 1)];
 }
 
-nonterminal DimUnit with unitEq;
+nonterminal DimUnit with unitEq, ppstr;
 synthesized attribute unitEq :: (Boolean ::= DimUnit);
+synthesized attribute ppstr :: String;
 
 abstract production meterUnit
 top::DimUnit ::=
 {
   top.unitEq = \unitToCompare :: DimUnit ->
     case unitToCompare of meterUnit() -> true | _ -> false end;
+  top.ppstr = "m";
 }
 
 abstract production kilogramUnit
@@ -57,6 +65,7 @@ top::DimUnit ::=
 {
   top.unitEq = \unitToCompare :: DimUnit ->
     case unitToCompare of kilogramUnit() -> true | _ -> false end;
+  top.ppstr = "kg";
 }
 
 abstract production secondUnit
@@ -64,6 +73,7 @@ top::DimUnit ::=
 {
   top.unitEq = \unitToCompare :: DimUnit ->
     case unitToCompare of secondUnit() -> true | _ -> false end;
+  top.ppstr = "s";
 }
 
 abstract production ampereUnit
@@ -71,6 +81,7 @@ top::DimUnit ::=
 {
   top.unitEq = \unitToCompare :: DimUnit ->
     case unitToCompare of ampereUnit() -> true | _ -> false end;
+  top.ppstr = "A";
 }
 
 abstract production kelvinUnit
@@ -78,6 +89,7 @@ top::DimUnit ::=
 {
   top.unitEq = \unitToCompare :: DimUnit ->
     case unitToCompare of kelvinUnit() -> true | _ -> false end;
+  top.ppstr = "K";
 }
 
 abstract production moleUnit
@@ -85,6 +97,7 @@ top::DimUnit ::=
 {
   top.unitEq = \unitToCompare :: DimUnit ->
     case unitToCompare of moleUnit() -> true | _ -> false end;
+  top.ppstr = "mol";
 }
 
 abstract production candelaUnit
@@ -92,6 +105,7 @@ top::DimUnit ::=
 {
   top.unitEq = \unitToCompare :: DimUnit ->
     case unitToCompare of candelaUnit() -> true | _ -> false end;
+  top.ppstr = "cd";
 }
 
 aspect production addOp
@@ -238,4 +252,13 @@ function expUnits
   return map(eu, xs);
 }
 
+function showUnit
+String ::= u::Pair<DimUnit Integer>
+{
+  local power :: Integer = snd(u);
+  return
+    if   power == 1
+    then fst(u).ppstr
+    else fst(u).ppstr ++ "^" ++ toString(power);
+}
 
