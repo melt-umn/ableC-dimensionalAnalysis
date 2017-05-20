@@ -17,14 +17,14 @@ top::Qualifier ::=
 abstract production unitsQualifier
 top::Qualifier ::= units::[Pair<DimUnit Integer>]
 {
-  propagate host, lifted;
-  top.pp = text("");
-  top.qualname = "units(" ++ implode("*", map(showUnit, units)) ++ ")";
+  top.pp = text("units(" ++ implode("*", map(showUnit, units)) ++ ")");
+  top.mangledName = "units_" ++ implode("_", map(mangleUnit, units));
   top.qualIsPositive = false;
   top.qualIsNegative = true;
   top.qualAppliesWithinRef = true;
   top.qualCompat = \qualToCompare::Qualifier ->
     unitsCompat(top.normalUnits, qualToCompare.normalUnits);
+  top.qualIsHost = false;
   top.normalUnits = units;
 }
 
@@ -142,7 +142,7 @@ aspect production mulOp
 top::NumOp ::=
 {
   local units :: [Pair<DimUnit Integer>] =
-    collectUnits(getQualifiers(top.lop.typerep) ++ getQualifiers(top.rop.typerep));
+    collectUnits(qualifierCat(getQualifiers(top.lop.typerep), getQualifiers(top.rop.typerep)));
 
   -- FIXME: exceeding flow type
   top.collectedTypeQualifiers <- [unitsQualifier(units)];
@@ -214,19 +214,17 @@ function insertUnit
 }
 
 function collectUnits
-[Pair<DimUnit Integer>] ::= qs::[Qualifier]
+[Pair<DimUnit Integer>] ::= qs::Qualifiers
 {
-  local q :: Qualifier = head(qs);
-  local rest :: [Pair<DimUnit Integer>] = collectUnits(tail(qs));
-
   return
-    if   null(qs)
-    then []
-    else
-      case q of
-        unitsQualifier(_) -> q.normalUnits ++ rest
-      | _                 -> rest
-      end;
+    case qs of
+      nilQualifier() -> []
+    | consQualifier(h, t) ->
+      case h of
+        unitsQualifier(_) -> h.normalUnits ++ collectUnits(t)
+      | _                 -> collectUnits(t)
+      end
+    end;
 }
 
 function appendUnits
@@ -260,5 +258,15 @@ String ::= u::Pair<DimUnit Integer>
     if   power == 1
     then fst(u).ppstr
     else fst(u).ppstr ++ "^" ++ toString(power);
+}
+
+function mangleUnit
+String ::= u::Pair<DimUnit Integer>
+{
+  local power :: Integer = snd(u);
+  return
+    if   power == 1
+    then fst(u).ppstr
+    else fst(u).ppstr ++ "_" ++ toString(power);
 }
 

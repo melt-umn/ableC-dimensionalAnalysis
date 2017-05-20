@@ -23,15 +23,15 @@ terminal Candela_t 'cd';
 concrete production unitsTypeQualifier_c
 top::TypeQualifier_c ::= 'units' p::UnitsParameter_c
 {
-  top.typeQualifiers = [p.ast];
+  top.typeQualifiers = p.ast;
   top.mutateTypeSpecifiers = [];
 }
 
-closed nonterminal UnitsParameter_c with location, ast<abs:Qualifier>;
+closed nonterminal UnitsParameter_c with location, ast<abs:Qualifiers>;
 concrete production unitsParameter_c
 top::UnitsParameter_c ::= '(' units::UnitsTerm_c ')'
 {
-  top.ast = unitsQualifier(units.ast.normalUnits);
+  top.ast = abs:foldQualifier([unitsQualifier(units.ast.normalUnits)]);
 }
 
 closed nonterminal UnitsTerm_c with location, ast<Units>;
