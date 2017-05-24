@@ -112,9 +112,9 @@ aspect production addOp
 top::NumOp ::=
 {
   local lunits :: [Pair<DimUnit Integer>] =
-    collectUnits(getQualifiers(top.lop.typerep));
+    collectUnits(top.lop.typerep.qualifiers);
   local runits :: [Pair<DimUnit Integer>] =
-    collectUnits(getQualifiers(top.rop.typerep));
+    collectUnits(top.rop.typerep.qualifiers);
 
   -- FIXME: exceeding flow type
   top.collectedTypeQualifiers <-
@@ -127,9 +127,9 @@ aspect production subOp
 top::NumOp ::=
 {
   local lunits :: [Pair<DimUnit Integer>] =
-    collectUnits(getQualifiers(top.lop.typerep));
+    collectUnits(top.lop.typerep.qualifiers);
   local runits :: [Pair<DimUnit Integer>] =
-    collectUnits(getQualifiers(top.rop.typerep));
+    collectUnits(top.rop.typerep.qualifiers);
 
   -- FIXME: exceeding flow type
   top.collectedTypeQualifiers <-
@@ -142,7 +142,7 @@ aspect production mulOp
 top::NumOp ::=
 {
   local units :: [Pair<DimUnit Integer>] =
-    collectUnits(qualifierCat(getQualifiers(top.lop.typerep), getQualifiers(top.rop.typerep)));
+    collectUnits(top.lop.typerep.qualifiers ++ top.rop.typerep.qualifiers);
 
   -- FIXME: exceeding flow type
   top.collectedTypeQualifiers <- [unitsQualifier(units)];
@@ -152,8 +152,8 @@ aspect production divOp
 top::NumOp ::=
 {
   local units :: [Pair<DimUnit Integer>] =
-    collectUnits(getQualifiers(top.lop.typerep)) ++
-      invertUnits(collectUnits(getQualifiers(top.rop.typerep)));
+    collectUnits(top.lop.typerep.qualifiers) ++
+      invertUnits(collectUnits(top.rop.typerep.qualifiers));
 
   -- FIXME: exceeding flow type
   top.collectedTypeQualifiers <- [unitsQualifier(units)];
@@ -214,17 +214,19 @@ function insertUnit
 }
 
 function collectUnits
-[Pair<DimUnit Integer>] ::= qs::Qualifiers
+[Pair<DimUnit Integer>] ::= qs::[Qualifier]
 {
+  local q :: Qualifier = head(qs);
+  local rest :: [Pair<DimUnit Integer>] = collectUnits(tail(qs));
+
   return
-    case qs of
-      nilQualifier() -> []
-    | consQualifier(h, t) ->
-      case h of
-        unitsQualifier(_) -> h.normalUnits ++ collectUnits(t)
-      | _                 -> collectUnits(t)
-      end
-    end;
+    if   null(qs)
+    then []
+    else
+      case q of
+        unitsQualifier(_) -> q.normalUnits ++ rest
+      | _                 -> rest
+      end;
 }
 
 function appendUnits
