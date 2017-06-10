@@ -26,6 +26,10 @@ top::Qualifier ::= units::[Pair<DimUnit Integer>]
     unitsCompat(top.normalUnits, qualToCompare.normalUnits);
   top.qualIsHost = false;
   top.normalUnits = units;
+  top.qualifyErrors =
+    if   containsMultipleUnits(top.typeToQualify.qualifiers)
+    then [err(top.location, "multiple units qualifiers")]
+    else [];
 }
 
 nonterminal Units with normalUnits;
@@ -116,10 +120,9 @@ top::NumOp ::=
   local runits :: [Pair<DimUnit Integer>] =
     collectUnits(top.rop.typerep.qualifiers);
 
-  -- FIXME: exceeding flow type
   top.collectedTypeQualifiers <-
     if   unitsCompat(lunits, runits)
-    then [unitsQualifier(lunits)]
+    then [unitsQualifier(lunits, location=bogusLoc())]
     else [];
 }
 
@@ -131,10 +134,9 @@ top::NumOp ::=
   local runits :: [Pair<DimUnit Integer>] =
     collectUnits(top.rop.typerep.qualifiers);
 
-  -- FIXME: exceeding flow type
   top.collectedTypeQualifiers <-
     if   unitsCompat(lunits, runits)
-    then [unitsQualifier(lunits)]
+    then [unitsQualifier(lunits, location=bogusLoc())]
     else [];
 }
 
@@ -144,8 +146,7 @@ top::NumOp ::=
   local units :: [Pair<DimUnit Integer>] =
     collectUnits(top.lop.typerep.qualifiers ++ top.rop.typerep.qualifiers);
 
-  -- FIXME: exceeding flow type
-  top.collectedTypeQualifiers <- [unitsQualifier(units)];
+  top.collectedTypeQualifiers <- [unitsQualifier(units, location=bogusLoc())];
 }
 
 aspect production divOp
@@ -155,8 +156,7 @@ top::NumOp ::=
     collectUnits(top.lop.typerep.qualifiers) ++
       invertUnits(collectUnits(top.rop.typerep.qualifiers));
 
-  -- FIXME: exceeding flow type
-  top.collectedTypeQualifiers <- [unitsQualifier(units)];
+  top.collectedTypeQualifiers <- [unitsQualifier(units, location=bogusLoc())];
 }
 
 function unitsCompat
@@ -270,5 +270,35 @@ String ::= u::Pair<DimUnit Integer>
     if   power == 1
     then fst(u).ppstr
     else fst(u).ppstr ++ "_" ++ toString(power);
+}
+
+function containsMultipleUnits
+Boolean ::= qs::[Qualifier]
+{
+  local h :: Qualifier = head(qs);
+  local t :: [Qualifier] = tail(qs);
+  return
+    if   null(qs)
+    then false
+    else
+      case h of
+        unitsQualifier(_) -> containsUnits(t)
+      | _                 -> containsMultipleUnits(t)
+      end;
+}
+
+function containsUnits
+Boolean ::= qs::[Qualifier]
+{
+  local h :: Qualifier = head(qs);
+  local t :: [Qualifier] = tail(qs);
+  return
+    if   null(qs)
+    then false
+    else
+      case h of
+        unitsQualifier(_) -> true
+      | _                 -> containsUnits(t)
+      end;
 }
 
