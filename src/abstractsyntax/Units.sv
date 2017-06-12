@@ -5,6 +5,8 @@ imports edu:umn:cs:melt:ableC:abstractsyntax:env;
 imports silver:langutil;
 imports silver:langutil:pp;
 
+global MODULE_NAME :: String = "edu:umn:cs:melt:exts:ableC:dimensionalAnalysis";
+
 -- normalized units, e.g. simplify (seconds*meters*seconds/meters) as (seconds^2)
 synthesized attribute normalUnits :: [Pair<DimUnit Integer>] occurs on Qualifier;
 
@@ -120,10 +122,17 @@ top::NumOp ::=
   local runits :: [Pair<DimUnit Integer>] =
     collectUnits(top.rop.typerep.qualifiers);
 
+  local compat :: Boolean = unitsCompat(lunits, runits);
+
   top.collectedTypeQualifiers <-
-    if   unitsCompat(lunits, runits)
-    then [unitsQualifier(lunits, location=bogusLoc())]
+    if   compat
+    then [unitsQualifier(lunits, location=builtinLoc(MODULE_NAME))]
     else [];
+
+  top.errors <-
+    if   compat
+    then []
+    else [err(top.location, "units of addition operands not compatible")];
 }
 
 aspect production subOp
@@ -134,10 +143,17 @@ top::NumOp ::=
   local runits :: [Pair<DimUnit Integer>] =
     collectUnits(top.rop.typerep.qualifiers);
 
+  local compat :: Boolean = unitsCompat(lunits, runits);
+
   top.collectedTypeQualifiers <-
-    if   unitsCompat(lunits, runits)
-    then [unitsQualifier(lunits, location=bogusLoc())]
+    if   compat
+    then [unitsQualifier(lunits, location=builtinLoc(MODULE_NAME))]
     else [];
+
+  top.errors <-
+    if   compat
+    then []
+    else [err(top.location, "units of subtraction operands not compatible")];
 }
 
 aspect production mulOp
@@ -146,7 +162,7 @@ top::NumOp ::=
   local units :: [Pair<DimUnit Integer>] =
     collectUnits(top.lop.typerep.qualifiers ++ top.rop.typerep.qualifiers);
 
-  top.collectedTypeQualifiers <- [unitsQualifier(units, location=bogusLoc())];
+  top.collectedTypeQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
 }
 
 aspect production divOp
@@ -156,7 +172,7 @@ top::NumOp ::=
     collectUnits(top.lop.typerep.qualifiers) ++
       invertUnits(collectUnits(top.rop.typerep.qualifiers));
 
-  top.collectedTypeQualifiers <- [unitsQualifier(units, location=bogusLoc())];
+  top.collectedTypeQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
 }
 
 function unitsCompat
