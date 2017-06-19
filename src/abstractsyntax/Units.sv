@@ -8,24 +8,27 @@ imports silver:langutil:pp;
 global MODULE_NAME :: String = "edu:umn:cs:melt:exts:ableC:dimensionalAnalysis";
 
 -- normalized units, e.g. simplify (seconds*meters*seconds/meters) as (seconds^2)
-synthesized attribute normalUnits :: [Pair<DimUnit Integer>] occurs on Qualifier;
+synthesized attribute normalUnits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> occurs on Qualifier;
 
 aspect default production
 top::Qualifier ::=
 {
-  top.normalUnits = [];
+  top.normalUnits = pair([], []);
 }
 
 abstract production unitsQualifier
-top::Qualifier ::= units::[Pair<DimUnit Integer>]
+top::Qualifier ::= units::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]>
 {
-  top.pp = text("units(" ++ implode("*", map(showUnit, units)) ++ ")");
-  top.mangledName = "units_" ++ implode("_", map(mangleUnit, units));
+  -- TODO: show conversion factors
+  top.pp = text("units(" ++ implode("*", map(showUnit, fst(units))) ++ ")");
+  top.mangledName = "units_" ++ implode("_", map(mangleUnit, fst(units)));
   top.qualIsPositive = false;
   top.qualIsNegative = true;
   top.qualAppliesWithinRef = true;
   top.qualCompat = \qualToCompare::Qualifier ->
-    unitsCompat(top.normalUnits, qualToCompare.normalUnits);
+    unitsCompat(fst(top.normalUnits), fst(qualToCompare.normalUnits));
+  top.qualConversion = just(\qualToCompare::Qualifier ->
+    convertUnits(snd(top.normalUnits), snd(qualToCompare.normalUnits)));
   top.qualIsHost = false;
   top.normalUnits = units;
   top.qualifyErrors =
@@ -34,82 +37,100 @@ top::Qualifier ::= units::[Pair<DimUnit Integer>]
     else [];
 }
 
-nonterminal Units with normalUnits;
+nonterminal DerivedUnits with normalUnits;
 
-abstract production mulDimUnits
-top::Units ::= us1::Units us2::Units
+abstract production mulUnits
+top::DerivedUnits ::= us1::DerivedUnits us2::DerivedUnits
 {
   top.normalUnits = appendUnits(us1.normalUnits, us2.normalUnits);
 }
 
-abstract production expDimUnits
-top::Units ::= us::Units power::Integer
+abstract production expUnits
+top::DerivedUnits ::= us::DerivedUnits power::Integer
 {
-  top.normalUnits = expUnits(us.normalUnits, power);
+  top.normalUnits = mkExpUnits(us.normalUnits, power);
 }
 
-abstract production dimUnit
-top::Units ::= u::DimUnit
+abstract production scaledUnit
+top::DerivedUnits ::= u::BaseUnit conversionFactor::ConversionFactor
 {
-  top.normalUnits = [pair(u, 1)];
+  top.normalUnits = pair([pair(u, 1)], [pair(conversionFactor, 1)]);
 }
 
-nonterminal DimUnit with unitEq, ppstr;
-synthesized attribute unitEq :: (Boolean ::= DimUnit);
+nonterminal ConversionFactor with factor;
+synthesized attribute factor :: NumericConstant;
+
+-- scientific notation exponent, i.e. x in a*10^x
+abstract production sciExponent
+top::ConversionFactor ::= e::Integer
+{
+  top.factor = floatConstant("1E" ++ toString(e), doubleFloatSuffix(), location=builtinLoc(MODULE_NAME));
+}
+
+nonterminal BaseUnit with unitEq, ppstr;
+synthesized attribute unitEq :: (Boolean ::= BaseUnit);
 synthesized attribute ppstr :: String;
 
 abstract production meterUnit
-top::DimUnit ::=
+top::BaseUnit ::=
 {
-  top.unitEq = \unitToCompare :: DimUnit ->
+  top.unitEq = \unitToCompare :: BaseUnit ->
     case unitToCompare of meterUnit() -> true | _ -> false end;
   top.ppstr = "m";
 }
 
-abstract production kilogramUnit
-top::DimUnit ::=
+--abstract production kilogramUnit
+--top::BaseUnit ::=
+--{
+--  top.unitEq = \unitToCompare :: BaseUnit ->
+--    case unitToCompare of kilogramUnit() -> true | _ -> false end;
+--  top.ppstr = "kg";
+--}
+
+abstract production gramUnit
+top::BaseUnit ::=
 {
-  top.unitEq = \unitToCompare :: DimUnit ->
-    case unitToCompare of kilogramUnit() -> true | _ -> false end;
-  top.ppstr = "kg";
+  top.unitEq = \unitToCompare :: BaseUnit ->
+    case unitToCompare of gramUnit() -> true | _ -> false end;
+  top.ppstr = "g";
 }
 
 abstract production secondUnit
-top::DimUnit ::=
+top::BaseUnit ::=
 {
-  top.unitEq = \unitToCompare :: DimUnit ->
+  top.unitEq = \unitToCompare :: BaseUnit ->
     case unitToCompare of secondUnit() -> true | _ -> false end;
   top.ppstr = "s";
 }
 
 abstract production ampereUnit
-top::DimUnit ::=
+top::BaseUnit ::=
 {
-  top.unitEq = \unitToCompare :: DimUnit ->
+  top.unitEq = \unitToCompare :: BaseUnit ->
     case unitToCompare of ampereUnit() -> true | _ -> false end;
   top.ppstr = "A";
 }
 
 abstract production kelvinUnit
-top::DimUnit ::=
+top::BaseUnit ::=
 {
-  top.unitEq = \unitToCompare :: DimUnit ->
+  top.unitEq = \unitToCompare :: BaseUnit ->
     case unitToCompare of kelvinUnit() -> true | _ -> false end;
   top.ppstr = "K";
 }
 
 abstract production moleUnit
-top::DimUnit ::=
+top::BaseUnit ::=
 {
-  top.unitEq = \unitToCompare :: DimUnit ->
+  top.unitEq = \unitToCompare :: BaseUnit ->
     case unitToCompare of moleUnit() -> true | _ -> false end;
   top.ppstr = "mol";
 }
 
 abstract production candelaUnit
-top::DimUnit ::=
+top::BaseUnit ::=
 {
-  top.unitEq = \unitToCompare :: DimUnit ->
+  top.unitEq = \unitToCompare :: BaseUnit ->
     case unitToCompare of candelaUnit() -> true | _ -> false end;
   top.ppstr = "cd";
 }
@@ -117,12 +138,12 @@ top::DimUnit ::=
 aspect production addOp
 top::NumOp ::=
 {
-  local lunits :: [Pair<DimUnit Integer>] =
+  local lunits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
     collectUnits(top.lop.typerep.qualifiers);
-  local runits :: [Pair<DimUnit Integer>] =
+  local runits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
     collectUnits(top.rop.typerep.qualifiers);
 
-  local compat :: Boolean = unitsCompat(lunits, runits);
+  local compat :: Boolean = unitsCompat(fst(lunits), fst(runits));
 
   top.collectedTypeQualifiers <-
     if   compat
@@ -138,12 +159,12 @@ top::NumOp ::=
 aspect production subOp
 top::NumOp ::=
 {
-  local lunits :: [Pair<DimUnit Integer>] =
+  local lunits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
     collectUnits(top.lop.typerep.qualifiers);
-  local runits :: [Pair<DimUnit Integer>] =
+  local runits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
     collectUnits(top.rop.typerep.qualifiers);
 
-  local compat :: Boolean = unitsCompat(lunits, runits);
+  local compat :: Boolean = unitsCompat(fst(lunits), fst(runits));
 
   top.collectedTypeQualifiers <-
     if   compat
@@ -159,7 +180,7 @@ top::NumOp ::=
 aspect production mulOp
 top::NumOp ::=
 {
-  local units :: [Pair<DimUnit Integer>] =
+  local units :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
     collectUnits(top.lop.typerep.qualifiers ++ top.rop.typerep.qualifiers);
 
   top.collectedTypeQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
@@ -168,30 +189,96 @@ top::NumOp ::=
 aspect production divOp
 top::NumOp ::=
 {
-  local units :: [Pair<DimUnit Integer>] =
-    collectUnits(top.lop.typerep.qualifiers) ++
-      invertUnits(collectUnits(top.rop.typerep.qualifiers));
+  local lunits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
+    collectUnits(top.lop.typerep.qualifiers);
+  local runits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
+    invertUnits(collectUnits(top.rop.typerep.qualifiers));
+
+  local units :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
+    pair(fst(lunits) ++ fst(runits), snd(lunits) ++ snd(runits));
 
   top.collectedTypeQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
 }
 
 function unitsCompat
-Boolean ::= xs::[Pair<DimUnit Integer>] ys::[Pair<DimUnit Integer>]
+Boolean ::= xs::[Pair<BaseUnit Integer>]  ys::[Pair<BaseUnit Integer>]
 {
   return
     if   null(xs)
     then null(ys)
     else
       case removeUnit(head(xs), ys) of
-        just(ysRest) -> unitsCompat(tail(xs), ysRest)
+        just(ysRest) ->
+          unitsCompat(tail(xs), ysRest)
       | nothing() -> false
       end;
 }
 
-function removeUnit
-Maybe<[Pair<DimUnit Integer>]> ::= rm::Pair<DimUnit Integer> xs::[Pair<DimUnit Integer>]
+function convertUnits
+(Expr ::= Expr) ::= xs::[Pair<ConversionFactor Integer>]
+                                     ys::[Pair<ConversionFactor Integer>]
 {
-  local x :: Pair<DimUnit Integer> = head(xs);
+  return convertUnitsHelper(getConversions(xs, ys));
+}
+
+function convertUnitsHelper
+(Expr ::= Expr) ::= conversions::[Pair<ConversionFactor Integer>]
+{
+  return
+    if   null(conversions)
+    then \exprToConvert :: Expr -> exprToConvert
+    else \exprToConvert :: Expr ->
+      convertUnitsHelper(tail(conversions))
+        (applyConversion(head(conversions))(exprToConvert));
+}
+
+function applyConversion
+(Expr ::= Expr) ::= conversion::Pair<ConversionFactor Integer>
+{
+  local power :: Integer = snd(conversion);
+  local op :: BinOp =
+    numOp(
+      if   power > 0
+      then mulOp(location=builtinLoc(MODULE_NAME))
+      else divOp(location=builtinLoc(MODULE_NAME)),
+      location=builtinLoc(MODULE_NAME)
+    );
+  local newPower :: Integer = if power > 0 then power - 1 else power + 1;
+
+  return
+    if power == 0
+    then \exprToConvert :: Expr -> exprToConvert
+    else
+      \exprToConvert :: Expr ->
+        binaryOpExpr(
+          applyConversion(pair(fst(conversion), newPower))(exprToConvert),
+          op,
+          realConstant(
+            fst(conversion).factor,
+            location=builtinLoc(MODULE_NAME)
+          ),
+          location=builtinLoc(MODULE_NAME)
+        );
+}
+
+function getConversions
+[Pair<ConversionFactor Integer>] ::= xs::[Pair<ConversionFactor Integer>]
+                                     ys::[Pair<ConversionFactor Integer>]
+{
+  return
+    if   null(xs)
+    then ys
+    else
+      case removeConversionFactor(head(xs), ys) of
+        just(ysRest) -> getConversions(tail(xs), ysRest)
+      | nothing()    -> error("cannot convert units") -- this shouldn't happen
+      end;
+}
+
+function removeUnit
+Maybe<[Pair<BaseUnit Integer>]> ::= rm::Pair<BaseUnit Integer> xs::[Pair<BaseUnit Integer>]
+{
+  local x :: Pair<BaseUnit Integer> = head(xs);
 
   return
     if   null(xs)
@@ -211,10 +298,41 @@ Maybe<[Pair<DimUnit Integer>]> ::= rm::Pair<DimUnit Integer> xs::[Pair<DimUnit I
         end;
 }
 
-function insertUnit
-[Pair<DimUnit Integer>] ::= ins::Pair<DimUnit Integer>  xs::[Pair<DimUnit Integer>]
+function removeConversionFactor
+Maybe<[Pair<ConversionFactor Integer>]> ::= rm::Pair<ConversionFactor Integer>
+                                            xs::[Pair<ConversionFactor Integer>]
 {
-  local x :: Pair<DimUnit Integer> = head(xs);
+  local x :: Pair<ConversionFactor Integer> = head(xs);
+  local mRest :: Maybe<[Pair<ConversionFactor Integer>]> =
+    removeConversionFactor(rm, tail(xs));
+
+  return
+    if   null(xs)
+    then
+      case fst(rm) of
+        sciExponent(e1) -> just([pair(sciExponent(0 - e1), 1)])
+      | _               -> nothing()
+      end
+    else
+      case fst(rm), fst(x) of
+        sciExponent(e1), sciExponent(e2) ->
+          -- found match, done
+          if   snd(rm)*e1 == 0 - snd(x)*e2
+          then just(tail(xs))
+          -- found unit match but not power, subtract then done
+          else just(cons(pair(sciExponent(snd(rm)*e1 - snd(x)*e2), 1), tail(xs)))
+      | _, _ ->
+        case mRest of
+          just(rest) -> just(cons(x, rest))
+        | nothing()  -> nothing()
+        end
+      end;
+}
+
+function insertBaseUnit
+[Pair<BaseUnit Integer>] ::= ins::Pair<BaseUnit Integer>  xs::[Pair<BaseUnit Integer>]
+{
+  local x :: Pair<BaseUnit Integer> = head(xs);
 
   return
     if   null(xs)
@@ -226,50 +344,94 @@ function insertUnit
         then tail(xs)
         else cons(pair(fst(ins), snd(ins) + snd(x)), tail(xs))
       else
-        cons(x, insertUnit(ins, tail(xs)));
+        cons(x, insertBaseUnit(ins, tail(xs)));
+}
+
+function insertConversionFactor
+[Pair<ConversionFactor Integer>] ::= ins::Pair<ConversionFactor Integer>
+                                     xs::[Pair<ConversionFactor Integer>]
+{
+  local x :: Pair<ConversionFactor Integer> = head(xs);
+
+  return
+    if   null(xs)
+    then [ins]
+    else
+      case fst(ins), fst(x) of
+        sciExponent(e1), sciExponent(e2) ->
+          if   snd(ins)*e1 == 0 - snd(x)*e2
+          then tail(xs)
+          else cons(pair(sciExponent(snd(ins)*e1 + snd(x)*e2), 1), tail(xs))
+      | _, _ -> cons(x, insertConversionFactor(ins, tail(xs)))
+      end;
 }
 
 function collectUnits
-[Pair<DimUnit Integer>] ::= qs::[Qualifier]
+Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> ::= qs::[Qualifier]
 {
   local q :: Qualifier = head(qs);
-  local rest :: [Pair<DimUnit Integer>] = collectUnits(tail(qs));
+  local rest :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
+    collectUnits(tail(qs));
 
   return
     if   null(qs)
-    then []
+    then pair([], [])
     else
       case q of
-        unitsQualifier(_) -> q.normalUnits ++ rest
-      | _                 -> rest
+        unitsQualifier(_) ->
+          pair(fst(q.normalUnits) ++ fst(rest), snd(q.normalUnits) ++ snd(rest))
+      | _ -> rest
       end;
 }
 
 function appendUnits
-[Pair<DimUnit Integer>] ::= xs1::[Pair<DimUnit Integer>]  xs2::[Pair<DimUnit Integer>]
+Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> ::=
+  xs1::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]>
+  xs2::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]>
+{
+  return pair(appendBaseUnits(fst(xs1), fst(xs2)), appendConversionFactors(snd(xs1), snd(xs2)));
+}
+
+function appendBaseUnits
+[Pair<BaseUnit Integer>] ::= xs1::[Pair<BaseUnit Integer>] xs2::[Pair<BaseUnit Integer>]
 {
   return
     if   null(xs1)
     then xs2
-    else appendUnits(tail(xs1), insertUnit(head(xs1), xs2));
+    else appendBaseUnits(tail(xs1), insertBaseUnit(head(xs1), xs2));
+}
+
+function appendConversionFactors
+[Pair<ConversionFactor Integer>] ::= xs1::[Pair<ConversionFactor Integer>]
+                                     xs2::[Pair<ConversionFactor Integer>]
+{
+  return
+    if   null(xs1)
+    then xs2
+    else appendConversionFactors(tail(xs1), insertConversionFactor(head(xs1), xs2));
 }
 
 function invertUnits
-[Pair<DimUnit Integer>] ::= xs::[Pair<DimUnit Integer>]
+Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> ::=
+  xs::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]>
 {
-  return expUnits(xs, -1);
+  return mkExpUnits(xs, -1);
 }
 
-function expUnits
-[Pair<DimUnit Integer>] ::= xs::[Pair<DimUnit Integer>]  power::Integer
+function mkExpUnits
+Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> ::=
+  xs::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]>
+  power::Integer
 {
-  local eu :: (Pair<DimUnit Integer> ::= Pair<DimUnit Integer>) =
-    \u :: Pair<DimUnit Integer> -> pair(fst(u), power * snd(u));
-  return map(eu, xs);
+  local eu :: (Pair<BaseUnit Integer> ::= Pair<BaseUnit Integer>) =
+    \u :: Pair<BaseUnit Integer> -> pair(fst(u), power * snd(u));
+  local ec :: (Pair<ConversionFactor Integer> ::= Pair<ConversionFactor Integer>) =
+    \c :: Pair<ConversionFactor Integer> -> pair(fst(c), power * snd(c));
+  return pair(map(eu, fst(xs)), map(ec, snd(xs)));
 }
 
 function showUnit
-String ::= u::Pair<DimUnit Integer>
+String ::= u::Pair<BaseUnit Integer>
 {
   local power :: Integer = snd(u);
   return
@@ -279,7 +441,7 @@ String ::= u::Pair<DimUnit Integer>
 }
 
 function mangleUnit
-String ::= u::Pair<DimUnit Integer>
+String ::= u::Pair<BaseUnit Integer>
 {
   local power :: Integer = snd(u);
   return
