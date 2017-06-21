@@ -5,6 +5,8 @@ imports edu:umn:cs:melt:ableC:abstractsyntax:env;
 imports silver:langutil;
 imports silver:langutil:pp;
 
+import edu:umn:cs:melt:ableC:abstractsyntax:overload as ovrld;
+
 global MODULE_NAME :: String = "edu:umn:cs:melt:exts:ableC:dimensionalAnalysis";
 
 -- normalized units, e.g. simplify (seconds*meters*seconds/meters) as (seconds^2)
@@ -27,8 +29,8 @@ top::Qualifier ::= units::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor I
   top.qualAppliesWithinRef = true;
   top.qualCompat = \qualToCompare::Qualifier ->
     unitsCompat(fst(top.normalUnits), fst(qualToCompare.normalUnits));
-  top.qualConversion = just(\qualToCompare::Qualifier ->
-    convertUnits(snd(top.normalUnits), snd(qualToCompare.normalUnits)));
+--  top.qualConversion = just(\qualToCompare::Qualifier ->
+--    convertUnits(snd(top.normalUnits), snd(qualToCompare.normalUnits)));
   top.qualIsHost = false;
   top.normalUnits = units;
   top.qualifyErrors =
@@ -135,13 +137,13 @@ top::BaseUnit ::=
   top.ppstr = "cd";
 }
 
-aspect production addOp
-top::NumOp ::=
+aspect production ovrld:addExpr
+top::Expr ::= lhs::Expr rhs::Expr
 {
   local lunits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
-    collectUnits(top.lop.typerep.qualifiers);
+    collectUnits(lhs.typerep.qualifiers);
   local runits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
-    collectUnits(top.rop.typerep.qualifiers);
+    collectUnits(rhs.typerep.qualifiers);
 
   local compat :: Boolean = unitsCompat(fst(lunits), fst(runits));
 
@@ -156,13 +158,13 @@ top::NumOp ::=
     else [err(top.location, "units of addition operands not compatible")];
 }
 
-aspect production subOp
-top::NumOp ::=
+aspect production ovrld:subExpr
+top::Expr ::= lhs::Expr rhs::Expr
 {
   local lunits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
-    collectUnits(top.lop.typerep.qualifiers);
+    collectUnits(lhs.typerep.qualifiers);
   local runits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
-    collectUnits(top.rop.typerep.qualifiers);
+    collectUnits(rhs.typerep.qualifiers);
 
   local compat :: Boolean = unitsCompat(fst(lunits), fst(runits));
 
