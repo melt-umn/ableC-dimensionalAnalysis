@@ -59,6 +59,7 @@ top::DerivedUnits ::= u::BaseUnit conversionFactor::ConversionFactor
   top.normalUnits = pair([pair(u, 1)], [pair(conversionFactor, 1)]);
 }
 
+-- constant to multiply by to convert to the base unit
 nonterminal ConversionFactor with factor;
 synthesized attribute factor :: NumericConstant;
 
@@ -66,7 +67,7 @@ synthesized attribute factor :: NumericConstant;
 abstract production sciExponent
 top::ConversionFactor ::= e::Integer
 {
-  top.factor = floatConstant("1E" ++ toString(e), doubleFloatSuffix(), location=builtinLoc(MODULE_NAME));
+  top.factor = floatConstant("1E" ++ toString(0 - e), doubleFloatSuffix(), location=builtinLoc(MODULE_NAME));
 }
 
 nonterminal BaseUnit with unitEq, ppstr;
@@ -152,6 +153,11 @@ top::Expr ::= lhs::Expr rhs::Expr
     then [unitsQualifier(lunits, location=builtinLoc(MODULE_NAME))]
     else [];
 
+  rhsRuntimeConversions <-
+    if   compat
+    then [convertUnits(snd(lunits), snd(runits))]
+    else [];
+
   top.errors <-
     if   compat
     then []
@@ -171,6 +177,11 @@ top::Expr ::= lhs::Expr rhs::Expr
   top.collectedTypeQualifiers <-
     if   compat
     then [unitsQualifier(lunits, location=builtinLoc(MODULE_NAME))]
+    else [];
+
+  rhsRuntimeConversions <-
+    if   compat
+    then [convertUnits(snd(lunits), snd(runits))]
     else [];
 
   top.errors <-
@@ -216,6 +227,7 @@ Boolean ::= xs::[Pair<BaseUnit Integer>]  ys::[Pair<BaseUnit Integer>]
       end;
 }
 
+-- TODO: wrap in Maybe instead of using id function to handle no conversion needed
 function convertUnits
 (Expr ::= Expr) ::= xs::[Pair<ConversionFactor Integer>]
                                      ys::[Pair<ConversionFactor Integer>]
@@ -319,7 +331,7 @@ Maybe<[Pair<ConversionFactor Integer>]> ::= rm::Pair<ConversionFactor Integer>
       case fst(rm), fst(x) of
         sciExponent(e1), sciExponent(e2) ->
           -- found match, done
-          if   snd(rm)*e1 == 0 - snd(x)*e2
+          if   snd(rm)*e1 == snd(x)*e2
           then just(tail(xs))
           -- found unit match but not power, subtract then done
           else just(cons(pair(sciExponent(snd(rm)*e1 - snd(x)*e2), 1), tail(xs)))
