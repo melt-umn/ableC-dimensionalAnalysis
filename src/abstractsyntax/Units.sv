@@ -28,7 +28,8 @@ top::Qualifier ::= units::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor I
   top.qualIsNegative = true;
   top.qualAppliesWithinRef = true;
   top.qualCompat = \qualToCompare::Qualifier ->
-    unitsCompat(fst(top.normalUnits), fst(qualToCompare.normalUnits));
+    unitsCompat(fst(top.normalUnits), fst(qualToCompare.normalUnits)) &&
+    !convertUnits(snd(top.normalUnits), snd(qualToCompare.normalUnits)).isJust;
 --  top.qualConversion = just(\qualToCompare::Qualifier ->
 --    convertUnits(snd(top.normalUnits), snd(qualToCompare.normalUnits)));
   top.qualIsHost = false;
@@ -37,6 +38,36 @@ top::Qualifier ::= units::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor I
     if   containsMultipleUnits(top.typeToQualify.qualifiers)
     then [err(top.location, "multiple units qualifiers")]
     else [];
+}
+
+abstract production convertUnitsExpr
+top::Expr ::= convertToUnits::DerivedUnits e::Expr
+{
+  local eUnits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
+    collectUnits(e.typerep.qualifiers);
+
+  local compat :: Boolean = unitsCompat(fst(convertToUnits.normalUnits), fst(eUnits));
+
+  top.errors <-
+    if   compat
+    then []
+    else [err(top.location, "units of `convert_units' operands not compatible")];
+
+  top.typerep =
+    case convertUnits(snd(convertToUnits.normalUnits), snd(eUnits)) of
+      just(conversion) ->
+        addQualifiers(
+          [unitsQualifier(convertToUnits.normalUnits, location=builtinLoc(MODULE_NAME))],
+          dropUnits(forward.typerep)
+        )
+    | _                -> forward.typerep
+    end;
+
+  forwards to
+    case convertUnits(snd(convertToUnits.normalUnits), snd(eUnits)) of
+      just(conversion) -> conversion(e)
+    | _                -> e
+    end;
 }
 
 nonterminal DerivedUnits with normalUnits;
@@ -155,7 +186,11 @@ top::Expr ::= lhs::Expr rhs::Expr
 
   rhsRuntimeConversions <-
     if   compat
-    then [convertUnits(snd(lunits), snd(runits))]
+    then
+      case convertUnits(snd(lunits), snd(runits)) of
+        just(conversion) -> [conversion]
+      | _                -> []
+      end
     else [];
 
   top.errors <-
@@ -164,7 +199,7 @@ top::Expr ::= lhs::Expr rhs::Expr
     else [err(top.location, "units of addition operands not compatible")];
 }
 
-aspect production ovrld:subExpr
+aspect production ovrld:subtractExpr
 top::Expr ::= lhs::Expr rhs::Expr
 {
   local lunits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
@@ -181,7 +216,11 @@ top::Expr ::= lhs::Expr rhs::Expr
 
   rhsRuntimeConversions <-
     if   compat
-    then [convertUnits(snd(lunits), snd(runits))]
+    then
+      case convertUnits(snd(lunits), snd(runits)) of
+        just(conversion) -> [conversion]
+      | _                -> []
+      end
     else [];
 
   top.errors <-
@@ -227,23 +266,32 @@ Boolean ::= xs::[Pair<BaseUnit Integer>]  ys::[Pair<BaseUnit Integer>]
       end;
 }
 
--- TODO: wrap in Maybe instead of using id function to handle no conversion needed
 function convertUnits
-(Expr ::= Expr) ::= xs::[Pair<ConversionFactor Integer>]
+Maybe<(Expr ::= Expr)> ::= xs::[Pair<ConversionFactor Integer>]
                                      ys::[Pair<ConversionFactor Integer>]
 {
   return convertUnitsHelper(getConversions(xs, ys));
 }
 
 function convertUnitsHelper
-(Expr ::= Expr) ::= conversions::[Pair<ConversionFactor Integer>]
+Maybe<(Expr ::= Expr)> ::= conversions::[Pair<ConversionFactor Integer>]
 {
+  local mRest :: Maybe<(Expr ::= Expr)> = convertUnitsHelper(tail(conversions));
+
   return
     if   null(conversions)
-    then \exprToConvert :: Expr -> exprToConvert
-    else \exprToConvert :: Expr ->
-      convertUnitsHelper(tail(conversions))
-        (applyConversion(head(conversions))(exprToConvert));
+    then nothing()
+    else
+      just(
+        case mRest of
+          just(rest) ->
+            \exprToConvert :: Expr ->
+              rest(applyConversion(head(conversions))(exprToConvert))
+        | nothing()  ->
+            \exprToConvert :: Expr ->
+              applyConversion(head(conversions))(exprToConvert)
+        end
+      );
 }
 
 function applyConversion
@@ -393,9 +441,22 @@ Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> ::= qs::[Qualifi
     else
       case q of
         unitsQualifier(_) ->
-          pair(fst(q.normalUnits) ++ fst(rest), snd(q.normalUnits) ++ snd(rest))
+          appendUnits(q.normalUnits, rest)
       | _ -> rest
       end;
+}
+
+function dropUnits
+Type ::= ty::Type
+{
+  return
+    addQualifiers(
+      filter(
+        \q::Qualifier -> case q of unitsQualifier(_) -> false | _ -> true end,
+        ty.qualifiers
+      ),
+      ty.withoutTypeQualifiers
+    );
 }
 
 function appendUnits

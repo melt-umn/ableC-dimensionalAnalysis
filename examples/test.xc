@@ -21,10 +21,11 @@ int main(void)
     units(m) double perim = 2. * (length + width);
 
     /* when multiplying, units also multiply */
-    units(m^2) double area = length * width;
+    /* `convert_units' will convert units(m*mm) to units(m^2) at runtime */
+    units(m^2) double area = convert_units<m^2>(length * width);
 
     /* when dividing, units also divide */
-    units(kg/m^3) double density = mass / (area * height);
+//    units(kg/m^3) double density = mass / (area * height);
 
     /* type error, wrong units */
 //    units(kg*s) double wrong = mass * length;
