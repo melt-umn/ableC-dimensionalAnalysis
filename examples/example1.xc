@@ -25,7 +25,7 @@ int main(void)
     units(m^2) double area = convert_units<m^2>(length * width);
 
     /* when dividing, units also divide */
-//    units(kg/m^3) double density = mass / (area * height);
+    units(kg/m^3) double density = mass / (area * height);
 
     /* type error, wrong units */
 //    units(kg*s) double wrong = mass * length;

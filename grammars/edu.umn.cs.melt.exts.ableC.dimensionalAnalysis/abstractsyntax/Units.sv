@@ -1,4 +1,4 @@
-grammar edu:umn:cs:melt:exts:ableC:dimensionalAnalysis:src:abstractsyntax; 
+grammar edu:umn:cs:melt:exts:ableC:dimensionalAnalysis:abstractsyntax; 
 
 imports edu:umn:cs:melt:ableC:abstractsyntax;
 imports edu:umn:cs:melt:ableC:abstractsyntax:env;

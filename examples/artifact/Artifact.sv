@@ -1,4 +1,4 @@
-grammar edu:umn:cs:melt:exts:ableC:dimensionalAnalysis:artifact;
+grammar artifact;
 
 {- This Silver specification does litte more than list the desired
    extensions, albeit in a somewhat stylized way.
@@ -8,7 +8,8 @@ grammar edu:umn:cs:melt:exts:ableC:dimensionalAnalysis:artifact;
  -}
 
 import edu:umn:cs:melt:ableC:concretesyntax as cst;
-import edu:umn:cs:melt:ableC:drivers:parseAndPrint;
+import edu:umn:cs:melt:ableC:drivers:compile;
+
 
 parser extendedParser :: cst:Root {
   edu:umn:cs:melt:ableC:concretesyntax;

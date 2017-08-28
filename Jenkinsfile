@@ -12,6 +12,11 @@ properties([
         name: 'SILVER_BASE',
         defaultValue: '/export/scratch/melt-jenkins/custom-silver/',
         description: 'Silver installation path to use. Currently assumes only one build machine. Otherwise a path is not sufficient, we need to copy artifacts or something else.'
+      ],
+      [ $class: 'StringParameterDefinition',
+        name: 'ABLEC_BASE',
+        defaultValue: "ableC",
+        description: 'AbleC installation path to use.'
       ]
     ]
   ],
@@ -35,60 +40,142 @@ properties([
    into an actual object of that type, with the remainder of the map being its
    parameters. */
 
+/* a node allocates an executor to actually do work */
+node {
+  try {
+    // notifyBuild('STARTED')
 
-/* stages are pretty much just labels about what's going on */
+    def extension_name = "ableC-dimensionalAnalysis"
 
-stage ("Build") {
+    /* the full path to ableC, use parameter as-is if changed from default,
+     * otherwise prepend full path to workspace */
+    def ablec_base = (params.ABLEC_BASE == 'ableC') ? "${WORKSPACE}/${params.ABLEC_BASE}" : params.ABLEC_BASE
+    def env = [
+      "PATH=${params.SILVER_BASE}/support/bin/:${env.PATH}",
+      "ABLEC_BASE=${ablec_base}",
+      "EXTS_BASE=${WORKSPACE}/extensions",
+      "SVFLAGS=-G ${WORKSPACE}/generated"
+    ]
 
-  /* a node allocates an executor to actually do work */
-  node {
+    /* stages are pretty much just labels about what's going on */
+    stage ("Build") {
+      /* Clean Silver-generated files from previous builds in this workspace */
+      sh "mkdir -p generated"
+      sh "rm -rf generated/* || true"
+
+      /* don't check out extension under ableC_Home because doing so would allow
+       * the Makefiles to find ableC with the included search paths, but we want
+       * to explicitly specify the path to ableC according to ABLEC_BASE */
     checkout([ $class: 'GitSCM',
-               branches: [[name: '*/develop']],
-               doGenerateSubmoduleConfigurations: false,
+               branches: scm.branches,
+               doGenerateSubmoduleConfigurations: scm.doGenerateSubmoduleConfigurations,
                extensions: [
                  [ $class: 'RelativeTargetDirectory',
-                   relativeTargetDir: 'ableC']
-               ],
-               submoduleCfg: [],
-               userRemoteConfigs: [
-                 [url: 'https://github.com/melt-umn/ableC.git']
-               ]
-             ])
-    checkout([ $class: 'GitSCM',
-               branches: [[name: '*/master']],
-               doGenerateSubmoduleConfigurations: false,
-               extensions: [
-                 [ $class: 'RelativeTargetDirectory',
-                   relativeTargetDir: 'ableC/edu.umn.cs.melt.exts.ableC.dims']
-               ],
-               submoduleCfg: [],
-               userRemoteConfigs: [
-                 [url: 'https://github.com/melt-umn/edu.umn.cs.melt.exts.ableC.dims.git']
-               ]
+                   relativeTargetDir: "extensions/${extension_name}"]
+                 ],
+               submoduleCfg: scm.submoduleCfg,
+               userRemoteConfigs: scm.userRemoteConfigs
              ])
 
-    /* env.PATH is the master's path, not the executor's */
-    withEnv(["PATH=${SILVER_BASE}/support/bin/:${env.PATH}"]) {
-      sh "cd ableC/edu.umn.cs.melt.exts.ableC.dims/artifact && ./build.sh"
+      checkout([ $class: 'GitSCM',
+                 branches: [[name: '*/develop']],
+                 doGenerateSubmoduleConfigurations: false,
+                 extensions: [
+                   [ $class: 'RelativeTargetDirectory',
+                     relativeTargetDir: 'ableC']
+                 ],
+                 submoduleCfg: [],
+                 userRemoteConfigs: [
+                   [url: 'https://github.com/melt-umn/ableC.git']
+                 ]
+               ])
+
+      /* env.PATH is the master's path, not the executor's */
+      withEnv(env) {
+        dir("extensions/${extension_name}") {
+          sh "make clean build"
+        }
+      }
+    }
+    
+    stage ("Examples") {
+      withEnv(env) {
+        dir("extensions/${extension_name}") {
+          sh "make examples"
+        }
+      }
+    }
+
+    stage ("Modular Analyses") {
+      withEnv(env) {
+        dir("extensions/${extension_name}") {
+          /* use -B option to always run analyses */
+          sh "make -B analyses"
+        }
+      }
+    }
+
+    stage ("Test") {
+      withEnv(env) {
+        dir("extensions/${extension_name}") {
+          /* use -B option to always run tests */
+          sh "make -B test"
+        }
+      }
     }
   }
+  catch (e) {
+    currentBuild.result = 'FAILURE'
+    throw e
+  }
+  finally {
+    def previousResult = currentBuild.previousBuild?.result
 
-}
-
-stage ("Modular Analyses") {
-  node {
-    withEnv(["PATH=${SILVER_BASE}/support/bin/:${env.PATH}"]) {
-      def mdir = "ableC/edu.umn.cs.melt.exts.ableC.dims/modular_analyses"
-      sh "cd ${mdir}/determinism && ./run.sh"
-      sh "cd ${mdir}/well_definedness && ./run.sh"
+    if (currentBuild.result == 'FAILURE') {
+      notifyBuild(currentBuild.result)
+    }
+    else if (currentBuild.result == null &&
+             previousResult && previousResult == 'FAILURE') {
+      notifyBuild('BACK_TO_NORMAL')
     }
   }
 }
 
-stage ("Test") {
-  node {
-    def top_dir = "ableC/edu.umn.cs.melt.exts.ableC.dims"
-    sh "cd ${top_dir} && ./the_tests.sh"
+/* Slack / email notification
+ * notifyBuild() author: fahl-design
+ * https://bitbucket.org/snippets/fahl-design/koxKe */
+def notifyBuild(String buildStatus = 'STARTED') {
+  // build status of null means successful
+  buildStatus =  buildStatus ?: 'SUCCESSFUL'
+
+  // Default values
+  def colorName = 'RED'
+  def colorCode = '#FF0000'
+  def subject = "${buildStatus}: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'"
+  def summary = "${subject} (${env.BUILD_URL})"
+  def details = """<p>STARTED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
+    <p>Check console output at &QUOT;<a href='${env.BUILD_URL}'>${env.JOB_NAME} [${env.BUILD_NUMBER}]</a>&QUOT;</p>"""
+
+  // Override default values based on build status
+  if (buildStatus == 'STARTED') {
+    color = 'YELLOW'
+    colorCode = '#FFFF00'
+  } else if (buildStatus == 'SUCCESSFUL' || buildStatus == 'BACK_TO_NORMAL') {
+    color = 'GREEN'
+    colorCode = '#00FF00'
+  } else {
+    color = 'RED'
+    colorCode = '#FF0000'
   }
+
+  // Send notifications
+  slackSend (color: colorCode, message: summary)
+
+  emailext(
+    subject: subject,
+    body: details,
+    to: 'evw@umn.edu',
+    recipientProviders: [[$class: 'CulpritsRecipientProvider']]
+  )
 }
 

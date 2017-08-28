@@ -1,4 +1,4 @@
-grammar edu:umn:cs:melt:exts:ableC:dimensionalAnalysis:src:concretesyntax:units;
+grammar edu:umn:cs:melt:exts:ableC:dimensionalAnalysis:concretesyntax:units;
 
 -- Import host language components
 imports edu:umn:cs:melt:ableC:concretesyntax;
@@ -8,7 +8,7 @@ imports edu:umn:cs:melt:ableC:abstractsyntax:construction as abs;
 
 -- Some library utilities and the dimensionalAnalysis abstract syntax
 imports silver:langutil;
-imports edu:umn:cs:melt:exts:ableC:dimensionalAnalysis:src:abstractsyntax ;
+imports edu:umn:cs:melt:exts:ableC:dimensionalAnalysis:abstractsyntax;
 
 marking terminal Units_t 'units' lexer classes {Ckeyword};
 
