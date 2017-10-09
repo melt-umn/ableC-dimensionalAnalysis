@@ -34,15 +34,18 @@ top::Qualifier ::= units::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor I
 --    convertUnits(snd(top.normalUnits), snd(qualToCompare.normalUnits)));
   top.qualIsHost = false;
   top.normalUnits = units;
-  top.qualifyErrors =
+  top.errors :=
     if   containsMultipleUnits(top.typeToQualify.qualifiers)
     then [err(top.location, "multiple units qualifiers")]
     else [];
 }
 
 abstract production convertUnitsExpr
-top::Expr ::= convertToUnits::DerivedUnits e::Expr
+top::Expr ::= convertToUnits::DerivedUnits  e::Expr
 {
+  -- TODO: fix convertUnitsExpr pp, add pp on DerivedUnits/BaseUnits
+  top.pp = ppConcat([ text("convert_units<"), text(">("), e.pp, text(")") ]);
+
   local eUnits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
     collectUnits(e.typerep.qualifiers);
 
@@ -179,16 +182,16 @@ top::Expr ::= lhs::Expr rhs::Expr
 
   local compat :: Boolean = unitsCompat(fst(lunits), fst(runits));
 
-  top.collectedTypeQualifiers <-
+  collectedTypeQualifiers <-
     if   compat
     then [unitsQualifier(lunits, location=builtinLoc(MODULE_NAME))]
     else [];
 
-  rhsRuntimeConversions <-
+  runtimeMods <-
     if   compat
     then
       case convertUnits(snd(lunits), snd(runits)) of
-        just(conversion) -> [conversion]
+        just(conversion) -> [rhsRuntimeMod(runtimeConversion(conversion))]
       | _                -> []
       end
     else [];
@@ -209,16 +212,16 @@ top::Expr ::= lhs::Expr rhs::Expr
 
   local compat :: Boolean = unitsCompat(fst(lunits), fst(runits));
 
-  top.collectedTypeQualifiers <-
+  collectedTypeQualifiers <-
     if   compat
     then [unitsQualifier(lunits, location=builtinLoc(MODULE_NAME))]
     else [];
 
-  rhsRuntimeConversions <-
+  runtimeMods <-
     if   compat
     then
       case convertUnits(snd(lunits), snd(runits)) of
-        just(conversion) -> [conversion]
+        just(conversion) -> [rhsRuntimeMod(runtimeConversion(conversion))]
       | _                -> []
       end
     else [];
@@ -312,7 +315,7 @@ function applyConversion
     then \exprToConvert :: Expr -> exprToConvert
     else
       \exprToConvert :: Expr ->
-        binaryOpExpr(
+        ovrld:binaryOpExpr(
           applyConversion(pair(fst(conversion), newPower))(exprToConvert),
           op,
           realConstant(
