@@ -6,7 +6,7 @@ imports silver:langutil;
 imports silver:langutil:pp;
 imports edu:umn:cs:melt:ableC:abstractsyntax:injectable;
 
-import edu:umn:cs:melt:ableC:abstractsyntax:overload as ovrld;
+import edu:umn:cs:melt:ableC:abstractsyntax:overloadable as ovrld;
 
 global MODULE_NAME :: String = "edu:umn:cs:melt:exts:ableC:dimensionalAnalysis";
 
@@ -183,7 +183,7 @@ top::Expr ::= lhs::Expr rhs::Expr
 
   local compat :: Boolean = unitsCompat(fst(lunits), fst(runits));
 
-  collectedTypeQualifiers <-
+  injectedQualifiers <-
     if   compat
     then [unitsQualifier(lunits, location=builtinLoc(MODULE_NAME))]
     else [];
@@ -213,7 +213,7 @@ top::Expr ::= lhs::Expr rhs::Expr
 
   local compat :: Boolean = unitsCompat(fst(lunits), fst(runits));
 
-  collectedTypeQualifiers <-
+  injectedQualifiers <-
     if   compat
     then [unitsQualifier(lunits, location=builtinLoc(MODULE_NAME))]
     else [];
@@ -239,7 +239,7 @@ top::NumOp ::=
   local units :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
     collectUnits(top.lop.typerep.qualifiers ++ top.rop.typerep.qualifiers);
 
-  top.collectedTypeQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
+  top.injectedQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
 }
 
 aspect production divOp
@@ -253,7 +253,7 @@ top::NumOp ::=
   local units :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
     pair(fst(lunits) ++ fst(runits), snd(lunits) ++ snd(runits));
 
-  top.collectedTypeQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
+  top.injectedQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
 }
 
 function unitsCompat
