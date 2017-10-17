@@ -1,11 +1,10 @@
 grammar edu:umn:cs:melt:exts:ableC:dimensionalAnalysis:abstractsyntax; 
 
-imports edu:umn:cs:melt:ableC:abstractsyntax;
-imports edu:umn:cs:melt:ableC:abstractsyntax:env;
-imports silver:langutil;
-imports silver:langutil:pp;
-imports edu:umn:cs:melt:ableC:abstractsyntax:injectable;
-
+import edu:umn:cs:melt:ableC:abstractsyntax:host;
+import edu:umn:cs:melt:ableC:abstractsyntax:env;
+import silver:langutil;
+import silver:langutil:pp;
+import edu:umn:cs:melt:ableC:abstractsyntax:injectable only runtimeMods, runtimeConversion, injectedQualifiers, rhsRuntimeMod;
 import edu:umn:cs:melt:ableC:abstractsyntax:overloadable as ovrld;
 
 global MODULE_NAME :: String = "edu:umn:cs:melt:exts:ableC:dimensionalAnalysis";
@@ -197,13 +196,13 @@ top::Expr ::= lhs::Expr rhs::Expr
       end
     else [];
 
-  top.errors <-
+  lerrors <-
     if   compat
     then []
     else [err(top.location, "units of addition operands not compatible")];
 }
 
-aspect production ovrld:subtractExpr
+aspect production ovrld:subExpr
 top::Expr ::= lhs::Expr rhs::Expr
 {
   local lunits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
@@ -227,33 +226,33 @@ top::Expr ::= lhs::Expr rhs::Expr
       end
     else [];
 
-  top.errors <-
+  lerrors <-
     if   compat
     then []
     else [err(top.location, "units of subtraction operands not compatible")];
 }
 
-aspect production mulOp
-top::NumOp ::=
+aspect production ovrld:mulExpr
+top::Expr ::= lhs::Expr rhs::Expr
 {
   local units :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
-    collectUnits(top.lop.typerep.qualifiers ++ top.rop.typerep.qualifiers);
+    collectUnits(lhs.typerep.qualifiers ++ rhs.typerep.qualifiers);
 
-  top.injectedQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
+  injectedQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
 }
 
-aspect production divOp
-top::NumOp ::=
+aspect production ovrld:divExpr
+top::Expr ::= lhs::Expr rhs::Expr
 {
   local lunits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
-    collectUnits(top.lop.typerep.qualifiers);
+    collectUnits(lhs.typerep.qualifiers);
   local runits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
-    invertUnits(collectUnits(top.rop.typerep.qualifiers));
+    invertUnits(collectUnits(rhs.typerep.qualifiers));
 
   local units :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
     pair(fst(lunits) ++ fst(runits), snd(lunits) ++ snd(runits));
 
-  top.injectedQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
+  injectedQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
 }
 
 function unitsCompat
@@ -302,29 +301,33 @@ function applyConversion
 (Expr ::= Expr) ::= conversion::Pair<ConversionFactor Integer>
 {
   local power :: Integer = snd(conversion);
-  local op :: BinOp =
-    numOp(
-      if   power > 0
-      then mulOp(location=builtinLoc(MODULE_NAME))
-      else divOp(location=builtinLoc(MODULE_NAME)),
-      location=builtinLoc(MODULE_NAME)
-    );
   local newPower :: Integer = if power > 0 then power - 1 else power + 1;
 
   return
     if power == 0
     then \exprToConvert :: Expr -> exprToConvert
     else
-      \exprToConvert :: Expr ->
-        ovrld:binaryOpExpr(
-          applyConversion(pair(fst(conversion), newPower))(exprToConvert),
-          op,
-          realConstant(
-            fst(conversion).factor,
+      if power > 0
+      then
+        \exprToConvert :: Expr ->
+          ovrld:mulExpr(
+            applyConversion(pair(fst(conversion), newPower))(exprToConvert),
+            realConstant(
+              fst(conversion).factor,
+              location=builtinLoc(MODULE_NAME)
+            ),
             location=builtinLoc(MODULE_NAME)
-          ),
-          location=builtinLoc(MODULE_NAME)
-        );
+          )
+      else
+        \exprToConvert :: Expr ->
+          ovrld:divExpr(
+            applyConversion(pair(fst(conversion), newPower))(exprToConvert),
+            realConstant(
+              fst(conversion).factor,
+              location=builtinLoc(MODULE_NAME)
+            ),
+            location=builtinLoc(MODULE_NAME)
+          );
 }
 
 function getConversions

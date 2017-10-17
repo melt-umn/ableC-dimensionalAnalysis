@@ -2,7 +2,7 @@ grammar edu:umn:cs:melt:exts:ableC:dimensionalAnalysis:concretesyntax:convertUni
 
 -- Import host language components
 imports edu:umn:cs:melt:ableC:concretesyntax;
-imports edu:umn:cs:melt:ableC:abstractsyntax as abs;
+imports edu:umn:cs:melt:ableC:abstractsyntax:host as abs;
 
 -- Some library utilities and the dimensionalAnalysis abstract syntax
 imports silver:langutil;
