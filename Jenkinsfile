@@ -78,7 +78,8 @@ node {
              ])
 
       checkout([ $class: 'GitSCM',
-                 branches: [[name: '*/develop']],
+//                 branches: [[name: '*/develop']],
+                 branches: [[name: '*/feature/type_qualifiers']],
                  doGenerateSubmoduleConfigurations: false,
                  extensions: [
                    [ $class: 'RelativeTargetDirectory',
