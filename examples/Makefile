@@ -13,14 +13,14 @@ all: ableC.jar examples
 
 ableC.jar: $(GRAMMAR_SOURCES)
 	touch artifact/Artifact.sv
-	silver -o $@ $(SVFLAGS) -I $(ABLEC_BASE) \
+	silver -o $@ -I $(ABLEC_BASE) \
 		     -I $(EXTS_BASE)/ableC-dimensionalAnalysis/grammars \
 		     $(SVFLAGS) artifact
 
 examples: example1.out
 
 example1.c: ableC.jar example1.xc
-	java -jar ableC.jar example1.xc
+	java -Xss6M -jar ableC.jar example1.xc
 
 example1.out: example1.c
 	gcc example1.c -o example1.out
