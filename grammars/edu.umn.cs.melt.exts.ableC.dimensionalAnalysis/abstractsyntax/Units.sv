@@ -29,11 +29,12 @@ top::Qualifier ::= units::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor I
   top.qualAppliesWithinRef = true;
   top.qualCompat = \qualToCompare::Qualifier ->
     unitsCompat(fst(top.normalUnits), fst(qualToCompare.normalUnits)) &&
-    !convertUnits(snd(top.normalUnits), snd(qualToCompare.normalUnits)).isJust;
+    null(getConversions(snd(top.normalUnits), snd(qualToCompare.normalUnits)));
+--    !convertUnits(snd(top.normalUnits), snd(qualToCompare.normalUnits)).isJust;
 --  top.qualConversion = just(\qualToCompare::Qualifier ->
 --    convertUnits(snd(top.normalUnits), snd(qualToCompare.normalUnits)));
   top.qualIsHost = false;
-  top.normalUnits = units;
+  top.normalUnits = normalizeUnits(units);
   top.errors :=
     if   containsMultipleUnits(top.typeToQualify.qualifiers)
     then [err(top.location, "multiple units qualifiers")]
@@ -236,7 +237,7 @@ aspect production ovrld:mulExpr
 top::Expr ::= lhs::Expr rhs::Expr
 {
   local units :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
-    collectUnits(lhs.typerep.qualifiers ++ rhs.typerep.qualifiers);
+    normalizeUnits(collectUnits(lhs.typerep.qualifiers ++ rhs.typerep.qualifiers));
 
   injectedQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
 }
@@ -250,7 +251,7 @@ top::Expr ::= lhs::Expr rhs::Expr
     invertUnits(collectUnits(rhs.typerep.qualifiers));
 
   local units :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
-    pair(fst(lunits) ++ fst(runits), snd(lunits) ++ snd(runits));
+    normalizeUnits(pair(fst(lunits) ++ fst(runits), snd(lunits) ++ snd(runits)));
 
   injectedQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
 }
@@ -359,7 +360,10 @@ Maybe<[Pair<BaseUnit Integer>]> ::= rm::Pair<BaseUnit Integer> xs::[Pair<BaseUni
         if   snd(rm) == snd(x)
         then just(tail(xs))
         -- found unit match but not power, subtract and continue
-        else removeUnit(pair(fst(rm), snd(rm) - snd(x)), tail(xs))
+        else
+          if snd(rm) == snd(x)
+          then just(tail(xs))
+          else removeUnit(pair(fst(rm), snd(rm) - snd(x)), tail(xs))
       else 
         case removeUnit(rm, tail(xs)) of
           just(rest) -> just(cons(x, rest))
@@ -389,7 +393,10 @@ Maybe<[Pair<ConversionFactor Integer>]> ::= rm::Pair<ConversionFactor Integer>
           if   snd(rm)*e1 == snd(x)*e2
           then just(tail(xs))
           -- found unit match but not power, subtract then done
-          else just(cons(pair(sciExponent(snd(rm)*e1 - snd(x)*e2), 1), tail(xs)))
+          else
+            if snd(rm)*e1 == snd(x)*e2
+            then just(tail(xs))
+            else just(cons(pair(sciExponent(snd(rm)*e1 - snd(x)*e2), 1), tail(xs)))
       | _, _ ->
         case mRest of
           just(rest) -> just(cons(x, rest))
@@ -464,6 +471,31 @@ Type ::= ty::Type
       ),
       ty.withoutTypeQualifiers
     );
+}
+
+function normalizeUnits
+Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> ::=
+  xs::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]>
+{
+  return pair(normalizeBaseUnits(fst(xs)), normalizeConversionFactors(snd(xs)));
+}
+
+function normalizeBaseUnits
+[Pair<BaseUnit Integer>] ::= xs::[Pair<BaseUnit Integer>]
+{
+  return
+    if null(xs)
+    then []
+    else insertBaseUnit(head(xs), normalizeBaseUnits(tail(xs)));
+}
+
+function normalizeConversionFactors
+[Pair<ConversionFactor Integer>] ::= xs::[Pair<ConversionFactor Integer>]
+{
+  return
+    if null(xs)
+    then []
+    else insertConversionFactor(head(xs), normalizeConversionFactors(tail(xs)));
 }
 
 function appendUnits
