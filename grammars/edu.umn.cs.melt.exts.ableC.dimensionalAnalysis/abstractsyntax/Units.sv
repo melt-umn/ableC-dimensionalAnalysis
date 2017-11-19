@@ -360,10 +360,7 @@ Maybe<[Pair<BaseUnit Integer>]> ::= rm::Pair<BaseUnit Integer> xs::[Pair<BaseUni
         if   snd(rm) == snd(x)
         then just(tail(xs))
         -- found unit match but not power, subtract and continue
-        else
-          if snd(rm) == snd(x)
-          then just(tail(xs))
-          else removeUnit(pair(fst(rm), snd(rm) - snd(x)), tail(xs))
+        else removeUnit(pair(fst(rm), snd(rm) - snd(x)), tail(xs))
       else 
         case removeUnit(rm, tail(xs)) of
           just(rest) -> just(cons(x, rest))
@@ -383,7 +380,7 @@ Maybe<[Pair<ConversionFactor Integer>]> ::= rm::Pair<ConversionFactor Integer>
     if   null(xs)
     then
       case fst(rm) of
-        sciExponent(e1) -> just([pair(sciExponent(0 - e1), 1)])
+        sciExponent(e1) -> just([pair(sciExponent(snd(rm) * e1), 1)])
       | _               -> nothing()
       end
     else
@@ -393,10 +390,7 @@ Maybe<[Pair<ConversionFactor Integer>]> ::= rm::Pair<ConversionFactor Integer>
           if   snd(rm)*e1 == snd(x)*e2
           then just(tail(xs))
           -- found unit match but not power, subtract then done
-          else
-            if snd(rm)*e1 == snd(x)*e2
-            then just(tail(xs))
-            else just(cons(pair(sciExponent(snd(rm)*e1 - snd(x)*e2), 1), tail(xs)))
+          else just(cons(pair(sciExponent(snd(rm)*e1 - snd(x)*e2), 1), tail(xs)))
       | _, _ ->
         case mRest of
           just(rest) -> just(cons(x, rest))
