@@ -1,6 +1,7 @@
 grammar edu:umn:cs:melt:exts:ableC:dimensionalAnalysis:abstractsyntax; 
 
 import edu:umn:cs:melt:ableC:abstractsyntax:host;
+import edu:umn:cs:melt:ableC:abstractsyntax:substitution;
 import edu:umn:cs:melt:ableC:abstractsyntax:env;
 import silver:langutil;
 import silver:langutil:pp;
@@ -44,6 +45,7 @@ top::Qualifier ::= units::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor I
 abstract production convertUnitsExpr
 top::Expr ::= convertToUnits::DerivedUnits  e::Expr
 {
+  propagate substituted;
   -- TODO: fix convertUnitsExpr pp, add pp on DerivedUnits/BaseUnits
   top.pp = ppConcat([ text("convert_units<"), text(">("), e.pp, text(")") ]);
 
