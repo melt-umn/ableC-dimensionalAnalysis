@@ -45,7 +45,6 @@ top::Qualifier ::= units::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor I
 abstract production convertUnitsExpr
 top::Expr ::= convertToUnits::DerivedUnits  e::Expr
 {
-  propagate substituted;
   -- TODO: fix convertUnitsExpr pp, add pp on DerivedUnits/BaseUnits
   top.pp = ppConcat([ text("convert_units<"), text(">("), e.pp, text(")") ]);
 
