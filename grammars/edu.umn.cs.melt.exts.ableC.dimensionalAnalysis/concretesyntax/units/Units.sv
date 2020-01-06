@@ -10,7 +10,7 @@ imports edu:umn:cs:melt:ableC:abstractsyntax:construction as abs;
 imports silver:langutil;
 imports edu:umn:cs:melt:exts:ableC:dimensionalAnalysis:abstractsyntax;
 
-marking terminal Units_t 'units' lexer classes {Ckeyword};
+marking terminal Units_t 'units' lexer classes {Keyword, Global};
 
 terminal Meter_t 'm';
 --terminal Kilogram_t 'kg';
