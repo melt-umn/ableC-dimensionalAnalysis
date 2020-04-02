@@ -1,7 +1,6 @@
 grammar edu:umn:cs:melt:exts:ableC:dimensionalAnalysis:abstractsyntax; 
 
 import edu:umn:cs:melt:ableC:abstractsyntax:host;
-import edu:umn:cs:melt:ableC:abstractsyntax:substitution;
 import edu:umn:cs:melt:ableC:abstractsyntax:env;
 import silver:langutil;
 import silver:langutil:pp;

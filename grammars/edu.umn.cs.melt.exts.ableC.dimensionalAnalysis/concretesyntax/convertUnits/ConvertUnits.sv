@@ -9,7 +9,7 @@ imports silver:langutil;
 imports edu:umn:cs:melt:exts:ableC:dimensionalAnalysis:abstractsyntax;
 imports edu:umn:cs:melt:exts:ableC:dimensionalAnalysis:concretesyntax:units;
 
-marking terminal ConvertUnits_t 'convert_units' lexer classes {Ckeyword};
+marking terminal ConvertUnits_t 'convert_units' lexer classes {Keyword, Global};
 
 concrete production convertUnitsExpr_c
 top::AssignExpr_c ::= 'convert_units' '<' units::UnitsTerm_c '>' '(' e::Expr_c ')'
