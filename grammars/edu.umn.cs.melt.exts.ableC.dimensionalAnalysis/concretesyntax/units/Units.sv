@@ -86,11 +86,11 @@ closed nonterminal Power_c with location, ast<Integer>;
 concrete productions top::Power_c
 | p::DecConstant_t
   {
-    top.ast = toInt(p.lexeme);
+    top.ast = toInteger(p.lexeme);
   }
 | '-' p::DecConstant_t
   {
-    top.ast = 0 - toInt(p.lexeme);
+    top.ast = 0 - toInteger(p.lexeme);
   }
 
 closed nonterminal UnitFactor_c with location, ast<DerivedUnits>;
