@@ -53,7 +53,7 @@ closed nonterminal UnitsParameter_c with location, ast<abs:Qualifiers>;
 concrete production unitsParameter_c
 top::UnitsParameter_c ::= '(' units::UnitsTerm_c ')'
 {
-  top.ast = abs:foldQualifier([unitsQualifier(units.ast.normalUnits, location=top.location)]);
+  top.ast = abs:foldQualifier([unitsQualifier(units.ast.normalUnits)]);
 }
 
 closed nonterminal UnitsTerm_c with location, ast<DerivedUnits>;

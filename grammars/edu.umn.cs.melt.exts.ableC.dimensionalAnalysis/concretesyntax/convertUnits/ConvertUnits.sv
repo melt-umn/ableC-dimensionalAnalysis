@@ -14,6 +14,6 @@ marking terminal ConvertUnits_t 'convert_units' lexer classes {Keyword, Global};
 concrete production convertUnitsExpr_c
 top::AssignExpr_c ::= 'convert_units' '<' units::UnitsTerm_c '>' '(' e::Expr_c ')'
 {
-  top.ast = convertUnitsExpr(units.ast, e.ast, location=top.location);
+  top.ast = convertUnitsExpr(units.ast, e.ast);
 }
 
