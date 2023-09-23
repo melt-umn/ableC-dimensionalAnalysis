@@ -46,6 +46,7 @@ top::Expr ::= convertToUnits::DerivedUnits  e::Expr
 {
   -- TODO: fix convertUnitsExpr pp, add pp on DerivedUnits/BaseUnits
   top.pp = ppConcat([ text("convert_units<"), text(">("), e.pp, text(")") ]);
+  propagate env, controlStmtContext;
 
   local eUnits :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
     collectUnits(e.typerep.qualifiers);
