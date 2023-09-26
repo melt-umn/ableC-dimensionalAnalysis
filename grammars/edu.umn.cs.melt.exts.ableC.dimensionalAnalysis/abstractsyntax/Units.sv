@@ -15,7 +15,7 @@ synthesized attribute normalUnits :: Pair<[Pair<BaseUnit Integer>] [Pair<Convers
 aspect default production
 top::Qualifier ::=
 {
-  top.normalUnits = pair([], []);
+  top.normalUnits = ([], []);
 }
 
 abstract production unitsQualifier
@@ -92,7 +92,7 @@ top::DerivedUnits ::= us::DerivedUnits power::Integer
 abstract production scaledUnit
 top::DerivedUnits ::= u::BaseUnit conversionFactor::ConversionFactor
 {
-  top.normalUnits = pair([pair(u, 1)], [pair(conversionFactor, 1)]);
+  top.normalUnits = ([(u, 1)], [(conversionFactor, 1)]);
 }
 
 -- constant to multiply by to convert to the base unit
@@ -252,7 +252,7 @@ top::Expr ::= lhs::Expr rhs::Expr
     invertUnits(collectUnits(rhs.typerep.qualifiers));
 
   local units :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
-    normalizeUnits(pair(fst(lunits) ++ fst(runits), snd(lunits) ++ snd(runits)));
+    normalizeUnits((fst(lunits) ++ fst(runits), snd(lunits) ++ snd(runits)));
 
   injectedQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
 }
@@ -313,7 +313,7 @@ function applyConversion
       then
         \exprToConvert :: Expr ->
           ovrld:mulExpr(
-            applyConversion(pair(fst(conversion), newPower))(exprToConvert),
+            applyConversion((fst(conversion), newPower))(exprToConvert),
             realConstant(
               fst(conversion).factor,
               location=builtinLoc(MODULE_NAME)
@@ -323,7 +323,7 @@ function applyConversion
       else
         \exprToConvert :: Expr ->
           ovrld:divExpr(
-            applyConversion(pair(fst(conversion), newPower))(exprToConvert),
+            applyConversion((fst(conversion), newPower))(exprToConvert),
             realConstant(
               fst(conversion).factor,
               location=builtinLoc(MODULE_NAME)
@@ -361,7 +361,7 @@ Maybe<[Pair<BaseUnit Integer>]> ::= rm::Pair<BaseUnit Integer> xs::[Pair<BaseUni
         if   snd(rm) == snd(x)
         then just(tail(xs))
         -- found unit match but not power, subtract and continue
-        else removeUnit(pair(fst(rm), snd(rm) - snd(x)), tail(xs))
+        else removeUnit((fst(rm), snd(rm) - snd(x)), tail(xs))
       else 
         case removeUnit(rm, tail(xs)) of
           just(rest) -> just(cons(x, rest))
@@ -381,7 +381,7 @@ Maybe<[Pair<ConversionFactor Integer>]> ::= rm::Pair<ConversionFactor Integer>
     if   null(xs)
     then
       case fst(rm) of
-        sciExponent(e1) -> just([pair(sciExponent(snd(rm) * e1), 1)])
+        sciExponent(e1) -> just([(sciExponent(snd(rm) * e1), 1)])
       | _               -> nothing()
       end
     else
@@ -391,7 +391,7 @@ Maybe<[Pair<ConversionFactor Integer>]> ::= rm::Pair<ConversionFactor Integer>
           if   snd(rm)*e1 == snd(x)*e2
           then just(tail(xs))
           -- found unit match but not power, subtract then done
-          else just(cons(pair(sciExponent(snd(rm)*e1 - snd(x)*e2), 1), tail(xs)))
+          else just(cons((sciExponent(snd(rm)*e1 - snd(x)*e2), 1), tail(xs)))
       | _, _ ->
         case mRest of
           just(rest) -> just(cons(x, rest))
@@ -413,7 +413,7 @@ function insertBaseUnit
       then
         if   snd(ins) == 0 - snd(x)
         then tail(xs)
-        else cons(pair(fst(ins), snd(ins) + snd(x)), tail(xs))
+        else cons((fst(ins), snd(ins) + snd(x)), tail(xs))
       else
         cons(x, insertBaseUnit(ins, tail(xs)));
 }
@@ -432,7 +432,7 @@ function insertConversionFactor
         sciExponent(e1), sciExponent(e2) ->
           if   snd(ins)*e1 == 0 - snd(x)*e2
           then tail(xs)
-          else cons(pair(sciExponent(snd(ins)*e1 + snd(x)*e2), 1), tail(xs))
+          else cons((sciExponent(snd(ins)*e1 + snd(x)*e2), 1), tail(xs))
       | _, _ -> cons(x, insertConversionFactor(ins, tail(xs)))
       end;
 }
@@ -446,7 +446,7 @@ Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> ::= qs::[Qualifi
 
   return
     if   null(qs)
-    then pair([], [])
+    then ([], [])
     else
       case q of
         unitsQualifier(_) ->
@@ -472,7 +472,7 @@ function normalizeUnits
 Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> ::=
   xs::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]>
 {
-  return pair(normalizeBaseUnits(fst(xs)), normalizeConversionFactors(snd(xs)));
+  return (normalizeBaseUnits(fst(xs)), normalizeConversionFactors(snd(xs)));
 }
 
 function normalizeBaseUnits
@@ -498,7 +498,7 @@ Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> ::=
   xs1::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]>
   xs2::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]>
 {
-  return pair(appendBaseUnits(fst(xs1), fst(xs2)), appendConversionFactors(snd(xs1), snd(xs2)));
+  return (appendBaseUnits(fst(xs1), fst(xs2)), appendConversionFactors(snd(xs1), snd(xs2)));
 }
 
 function appendBaseUnits
@@ -533,10 +533,10 @@ Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> ::=
   power::Integer
 {
   local eu :: (Pair<BaseUnit Integer> ::= Pair<BaseUnit Integer>) =
-    \u :: Pair<BaseUnit Integer> -> pair(fst(u), power * snd(u));
+    \u :: Pair<BaseUnit Integer> -> (fst(u), power * snd(u));
   local ec :: (Pair<ConversionFactor Integer> ::= Pair<ConversionFactor Integer>) =
-    \c :: Pair<ConversionFactor Integer> -> pair(fst(c), power * snd(c));
-  return pair(map(eu, fst(xs)), map(ec, snd(xs)));
+    \c :: Pair<ConversionFactor Integer> -> (fst(c), power * snd(c));
+  return (map(eu, fst(xs)), map(ec, snd(xs)));
 }
 
 function showUnit
