@@ -37,7 +37,7 @@ top::Qualifier ::= units::Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor I
   top.normalUnits = normalizeUnits(units);
   top.errors :=
     if   containsMultipleUnits(top.typeToQualify.qualifiers)
-    then [err(top.location, "multiple units qualifiers")]
+    then [errFromOrigin(top, "multiple units qualifiers")]
     else [];
 }
 
@@ -56,13 +56,13 @@ top::Expr ::= convertToUnits::DerivedUnits  e::Expr
   top.errors <-
     if   compat
     then []
-    else [err(top.location, "units of `convert_units' operands not compatible")];
+    else [errFromOrigin(top, "units of `convert_units' operands not compatible")];
 
   top.typerep =
     case convertUnits(snd(convertToUnits.normalUnits), snd(eUnits)) of
       just(conversion) ->
         addQualifiers(
-          [unitsQualifier(convertToUnits.normalUnits, location=builtinLoc(MODULE_NAME))],
+          [unitsQualifier(convertToUnits.normalUnits)],
           dropUnits(forward.typerep)
         )
     | _                -> forward.typerep
@@ -75,7 +75,7 @@ top::Expr ::= convertToUnits::DerivedUnits  e::Expr
     end;
 }
 
-nonterminal DerivedUnits with normalUnits;
+tracked nonterminal DerivedUnits with normalUnits;
 
 abstract production mulUnits
 top::DerivedUnits ::= us1::DerivedUnits us2::DerivedUnits
@@ -96,17 +96,17 @@ top::DerivedUnits ::= u::BaseUnit conversionFactor::ConversionFactor
 }
 
 -- constant to multiply by to convert to the base unit
-nonterminal ConversionFactor with factor;
+tracked nonterminal ConversionFactor with factor;
 synthesized attribute factor :: NumericConstant;
 
 -- scientific notation exponent, i.e. x in a*10^x
 abstract production sciExponent
 top::ConversionFactor ::= e::Integer
 {
-  top.factor = floatConstant("1E" ++ toString(0 - e), doubleFloatSuffix(), location=builtinLoc(MODULE_NAME));
+  top.factor = floatConstant("1E" ++ toString(0 - e), doubleFloatSuffix());
 }
 
-nonterminal BaseUnit with unitEq, ppstr;
+tracked nonterminal BaseUnit with unitEq, ppstr;
 synthesized attribute unitEq :: (Boolean ::= BaseUnit);
 synthesized attribute ppstr :: String;
 
@@ -186,7 +186,7 @@ top::Expr ::= lhs::Expr rhs::Expr
 
   injectedQualifiers <-
     if   compat
-    then [unitsQualifier(lunits, location=builtinLoc(MODULE_NAME))]
+    then [unitsQualifier(lunits)]
     else [];
 
   runtimeMods <-
@@ -201,7 +201,7 @@ top::Expr ::= lhs::Expr rhs::Expr
   lerrors <-
     if   compat
     then []
-    else [err(top.location, "units of addition operands not compatible")];
+    else [errFromOrigin(top, "units of addition operands not compatible")];
 }
 
 aspect production ovrld:subExpr
@@ -216,7 +216,7 @@ top::Expr ::= lhs::Expr rhs::Expr
 
   injectedQualifiers <-
     if   compat
-    then [unitsQualifier(lunits, location=builtinLoc(MODULE_NAME))]
+    then [unitsQualifier(lunits)]
     else [];
 
   runtimeMods <-
@@ -231,7 +231,7 @@ top::Expr ::= lhs::Expr rhs::Expr
   lerrors <-
     if   compat
     then []
-    else [err(top.location, "units of subtraction operands not compatible")];
+    else [errFromOrigin(top, "units of subtraction operands not compatible")];
 }
 
 aspect production ovrld:mulExpr
@@ -240,7 +240,7 @@ top::Expr ::= lhs::Expr rhs::Expr
   local units :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
     normalizeUnits(collectUnits(lhs.typerep.qualifiers ++ rhs.typerep.qualifiers));
 
-  injectedQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
+  injectedQualifiers <- [unitsQualifier(units)];
 }
 
 aspect production ovrld:divExpr
@@ -254,7 +254,7 @@ top::Expr ::= lhs::Expr rhs::Expr
   local units :: Pair<[Pair<BaseUnit Integer>] [Pair<ConversionFactor Integer>]> =
     normalizeUnits((fst(lunits) ++ fst(runits), snd(lunits) ++ snd(runits)));
 
-  injectedQualifiers <- [unitsQualifier(units, location=builtinLoc(MODULE_NAME))];
+  injectedQualifiers <- [unitsQualifier(units)];
 }
 
 function unitsCompat
@@ -315,20 +315,16 @@ function applyConversion
           ovrld:mulExpr(
             applyConversion((fst(conversion), newPower))(exprToConvert),
             realConstant(
-              fst(conversion).factor,
-              location=builtinLoc(MODULE_NAME)
-            ),
-            location=builtinLoc(MODULE_NAME)
+              fst(conversion).factor
+            )
           )
       else
         \exprToConvert :: Expr ->
           ovrld:divExpr(
             applyConversion((fst(conversion), newPower))(exprToConvert),
             realConstant(
-              fst(conversion).factor,
-              location=builtinLoc(MODULE_NAME)
-            ),
-            location=builtinLoc(MODULE_NAME)
+              fst(conversion).factor
+            )
           );
 }
 

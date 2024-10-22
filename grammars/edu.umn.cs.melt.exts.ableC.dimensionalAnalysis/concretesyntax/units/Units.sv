@@ -49,14 +49,14 @@ top::TypeQualifier_c ::= 'units' p::UnitsParameter_c
   top.mutateTypeSpecifiers = [];
 }
 
-closed nonterminal UnitsParameter_c with location, ast<abs:Qualifiers>;
+closed tracked nonterminal UnitsParameter_c with ast<abs:Qualifiers>;
 concrete production unitsParameter_c
 top::UnitsParameter_c ::= '(' units::UnitsTerm_c ')'
 {
-  top.ast = abs:foldQualifier([unitsQualifier(units.ast.normalUnits, location=top.location)]);
+  top.ast = abs:foldQualifier([unitsQualifier(units.ast.normalUnits)]);
 }
 
-closed nonterminal UnitsTerm_c with location, ast<DerivedUnits>;
+closed tracked nonterminal UnitsTerm_c with ast<DerivedUnits>;
 concrete productions top::UnitsTerm_c
 | us::UnitsTerm_c '*' u::UnitsExp_c
   {
@@ -71,7 +71,7 @@ concrete productions top::UnitsTerm_c
     top.ast = u.ast;
   }
 
-closed nonterminal UnitsExp_c with location, ast<DerivedUnits>;
+closed tracked nonterminal UnitsExp_c with ast<DerivedUnits>;
 concrete productions top::UnitsExp_c
 | u::UnitFactor_c '^' power::Power_c
   {
@@ -82,7 +82,7 @@ concrete productions top::UnitsExp_c
     top.ast = u.ast;
   }
 
-closed nonterminal Power_c with location, ast<Integer>;
+closed tracked nonterminal Power_c with ast<Integer>;
 concrete productions top::Power_c
 | p::DecConstant_t
   {
@@ -93,7 +93,7 @@ concrete productions top::Power_c
     top.ast = 0 - toInteger(p.lexeme);
   }
 
-closed nonterminal UnitFactor_c with location, ast<DerivedUnits>;
+closed tracked nonterminal UnitFactor_c with ast<DerivedUnits>;
 concrete productions top::UnitFactor_c
 | '(' us::UnitsTerm_c ')'
   {
@@ -108,7 +108,7 @@ concrete productions top::UnitFactor_c
     top.ast = scaledUnit(u.ast, sciExponent(0));
   }
 
-closed nonterminal UnitPrefix_c with location, ast<ConversionFactor>;
+closed tracked nonterminal UnitPrefix_c with ast<ConversionFactor>;
 concrete productions top::UnitPrefix_c
 | pre::Yotta_t
   {
@@ -192,7 +192,7 @@ concrete productions top::UnitPrefix_c
     top.ast = sciExponent(-24);
   }
 
-closed nonterminal BaseUnit_c with location, ast<BaseUnit>;
+closed tracked nonterminal BaseUnit_c with ast<BaseUnit>;
 concrete productions top::BaseUnit_c
 | unit::Meter_t
   {
